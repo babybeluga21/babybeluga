@@ -1,112 +1,89 @@
 /* ปุ่มทรงกลมข้างกล่องข้อความ */
 #cold-ext-btn {
-    width: 28px; /* ปรับขนาดเล็กลง */
-    height: 28px;
-    border-radius: 50%;
-    /* background: linear-gradient(145deg, #6c8090, #4a5c6a);  ลบพื้นหลังเดิม */
-    background-color: rgba(173, 216, 230, 0.5); /* สีฟ้าใสโปร่งใส */
-    color: white;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    cursor: pointer;
-    margin: 0 5px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
-    flex-shrink: 0;
-    /* font-size: 14px; ลบขนาดฟอนต์เดิม */
-    background-image: url('{{user}}'); /* ใช้รูปตัวละคร */
-    background-size: cover;
-    background-position: center;
-    border: 1px solid rgba(255, 255, 255, 0.3); /* เส้นขอบบางๆ */
 }
 
 #cold-ext-btn:hover {
-    background-color: rgba(173, 216, 230, 0.7); /* สีฟ้าใสโปร่งใสเมื่อ Hover */
-    transform: scale(1.1); /* ขยายเล็กน้อยเมื่อ Hover */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transform: scale(1.1); 
+    box-shadow: 0 0 8px rgba(135, 206, 235, 0.6); /* เรืองแสงสีฟ้าตอนชี้ */
+    border-color: rgba(255, 255, 255, 0.8) !important;
 }
 
-/* หน้าต่าง Modal ระบบค้นหา (ธีมใหม่) */
+/* หน้าต่าง Modal ระบบค้นหา (กระจกฝ้า สีฟ้าใสจางๆ) */
 #cold-ext-modal {
     display: none;
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(42, 50, 56, 0.85); /* สีเทาอมฟ้าเข้มแบบโปร่งใส */
-    border: 1px solid rgba(173, 216, 230, 0.4); /* เส้นขอบสีฟ้าใสบางๆ */
+    
+    /* หัวใจหลักของธีมกระจกมัว (Glassmorphism) */
+    background: rgba(30, 60, 90, 0.35); /* สีน้ำเงิน/เทาฟ้า โปร่งใสจางๆ */
+    backdrop-filter: blur(12px); /* ทำให้พื้นหลังมัว */
+    -webkit-backdrop-filter: blur(12px); /* สำหรับเบราว์เซอร์ตระกูล Webkit */
+    
+    border: 1px solid rgba(135, 206, 235, 0.3); /* ขอบสีฟ้าจางๆ ให้ดูเป็นแผ่นกระจก */
     border-radius: 12px;
     padding: 20px;
     width: 300px;
-    z-index: 9999;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5); /* เงาแบบ Soft */
-    backdrop-filter: blur(10px); /* เอฟเฟกต์เบลอพื้นหลัง */
+    z-index: 10001;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 0 10px rgba(255, 255, 255, 0.05);
     color: #e2e8f0;
     font-family: sans-serif;
 }
 
-#cold-ext-modal h4 {
-    margin-top: 0;
-    color: #add8e6; /* สีฟ้าใส */
-    font-size: 16px;
-    border-bottom: 1px solid rgba(173, 216, 230, 0.2);
-    padding-bottom: 10px;
-}
-
-#cold-ext-modal input {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 15px;
-    background: rgba(30, 36, 40, 0.7); /* สีเข้มโปร่งใส */
-    border: 1px solid rgba(173, 216, 230, 0.3); /* เส้นขอบสีฟ้าใส */
-    color: white;
-    border-radius: 8px;
-    box-sizing: border-box;
-}
-
 /* ปุ่มใน Modal */
 #cold-ext-modal button {
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.1); /* เพิ่มเส้นขอบบางๆ ให้ปุ่ม */
     padding: 10px 15px;
     margin: 0;
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: all 0.2s;
     font-size: 13px;
     font-weight: bold;
     color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
 #cold-ext-modal button:active {
-    transform: scale(0.98); /* เอฟเฟกต์กดปุ่ม */
+    transform: scale(0.96); 
 }
 
-/* ปุ่มหลัก (แยกรูท) */
+/* ปุ่มหลัก (แยกรูท) - ฟ้าใสแบบเจล */
 #cold-ext-modal .cold-btn-primary {
-    background: rgba(74, 92, 106, 0.8); /* สีเทาอมฟ้าโปร่งใส */
+    background: rgba(74, 144, 226, 0.4); 
 }
 
 #cold-ext-modal .cold-btn-primary:hover {
-    background: rgba(126, 151, 166, 0.9); /* สีเทาอมฟ้าสว่างขึ้นเมื่อ Hover */
+    background: rgba(74, 144, 226, 0.6); 
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
 }
 
-/* ปุ่มรอง (คัดลอก, เช็คโทเคน) */
+/* ปุ่มรอง (คัดลอก, เช็คโทเคน) - เทาอมฟ้าโปร่งใส */
 #cold-ext-modal .cold-btn-secondary {
-    background: rgba(48, 62, 72, 0.7); /* สีเทาเข้มโปร่งใส */
+    background: rgba(100, 116, 139, 0.4); 
 }
 
 #cold-ext-modal .cold-btn-secondary:hover {
-    background: rgba(70, 88, 102, 0.8); /* สีเทาเข้มสว่างขึ้นเมื่อ Hover */
+    background: rgba(100, 116, 139, 0.6);
 }
 
-/* ปุ่มปิด */
+/* ปุ่มปิด - แดงอมเทาโปร่งใส */
 #cold-ext-modal .cold-btn-danger {
-    background: rgba(140, 90, 90, 0.8); /* สีแดงอมเทาโปร่งใส */
-    grid-column: span 2; /* ขยายเต็มความกว้าง */
+    background: rgba(200, 70, 70, 0.4); 
+    grid-column: span 2; 
     margin-top: 10px;
 }
 
 #cold-ext-modal .cold-btn-danger:hover {
-    background: rgba(160, 110, 110, 0.9); /* สีแดงอมเทาสว่างขึ้นเมื่อ Hover */
+    background: rgba(200, 70, 70, 0.6); 
+}
+
+/* กล่องข้อความค้นหา (Input) */
+#cold-ext-modal input:focus {
+    outline: none;
+    border-color: rgba(135, 206, 235, 0.8) !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    box-shadow: 0 0 5px rgba(135, 206, 235, 0.3);
 }
