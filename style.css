@@ -1,0 +1,81 @@
+/* ปุ่มทรงกลมข้างกล่องข้อความ */
+#cold-ext-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #6c8090, #4a5c6a);
+    color: #e2e8f0;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    margin: 0 5px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+#cold-ext-btn:hover {
+    background: linear-gradient(145deg, #7E97A6, #5B6D7C);
+    box-shadow: inset 1px 1px 3px rgba(255,255,255,0.1);
+}
+
+/* หน้าต่าง Modal ระบบค้นหา */
+#cold-ext-modal {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #2a3238; /* สีเทาอมฟ้าเข้ม */
+    border: 1px solid #5B6D7C;
+    border-radius: 12px;
+    padding: 20px;
+    width: 300px;
+    z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    color: #cbd5e1;
+    font-family: sans-serif;
+}
+
+#cold-ext-modal h3 {
+    margin-top: 0;
+    color: #94a3b8;
+    font-size: 16px;
+    border-bottom: 1px solid #4a5c6a;
+    padding-bottom: 10px;
+}
+
+#cold-ext-modal input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    background: #1e2428;
+    border: 1px solid #4a5c6a;
+    color: white;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+#cold-ext-modal button {
+    background: #4a5c6a;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    margin: 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 13px;
+}
+
+#cold-ext-modal button:hover {
+    background: #7E97A6;
+}
+
+#cold-ext-modal .close-btn {
+    background: #8c5a5a;
+    width: 100%;
+    margin-top: 10px;
+}
+
