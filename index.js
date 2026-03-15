@@ -1,10 +1,9 @@
 import { 
     getContext, 
     extension_settings, 
-    getStrippedStack 
-} from '../../../../script.js';
-import { eventSource, event_types } from '../../../../events.js';
-import { saveSettingsDebounced } from '../../../../extensions.js';
+    saveSettingsDebounced 
+} from '../../../../extensions.js';
+import { eventSource, event_types } from '../../../../script.js';
 
 // --- Configuration ---
 const extensionName = "cold_system_tools";
@@ -82,8 +81,7 @@ function initUI() {
         const idx = parseInt($('#cold-idx-input').val());
         const chat = getContext().chat;
         if (chat[idx]) {
-            const count = Number($('#token_counter').text().split('/')[0]) || 0; // fallback แบบง่าย
-            alert(`ข้อความนี้มีประมาณ ${chat[idx].mes.length / 4} โทเคน (โดยประมาณ)`);
+            alert(`ข้อความนี้มีประมาณ ${Math.floor(chat[idx].mes.length / 4)} โทเคน (โดยประมาณ)`);
         }
     });
 
@@ -116,7 +114,7 @@ function setupSettings() {
                 </div>
                 <div class="inline-drawer-content">
                     <div class="flex-container">
-                        <label for="cold_opt_toggle">เปิดระบบ Token Optimizer (ซ่อน HTML <code>)</label>
+                        <label for="cold_opt_toggle">เปิดระบบ Token Optimizer (ซ่อน HTML &lt;code&gt;)</label>
                         <input type="checkbox" id="cold_opt_toggle" ${extension_settings[extensionName].enableHtmlOptimizer ? 'checked' : ''}>
                     </div>
                     <div style="margin-top:10px;">
@@ -145,12 +143,9 @@ function setupSettings() {
 eventSource.on(event_types.MAKE_PROMPT, (args) => {
     if (!extension_settings[extensionName].enableHtmlOptimizer) return;
 
-    // args.chat เป็นอาเรย์ข้อความที่จะส่งไปประมวลผล
     if (args && args.chat) {
         args.chat.forEach(msg => {
             if (msg.mes && msg.mes.includes('<code>')) {
-                // แทนที่เนื้อหาใน <code> ด้วย placeholder เพื่อประหยัดโทเคน
-                // โดยที่ข้อความในหน้าจอแชท (UI) ของผู้ใช้ยังคงเดิม
                 msg.mes = msg.mes.replace(/<code>[\s\S]*?<\/code>/g, extension_settings[extensionName].placeholderText);
             }
         });
