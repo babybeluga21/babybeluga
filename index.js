@@ -1,5 +1,14 @@
-import { getContext, extension_settings, saveSettingsDebounced } from '../../extensions.js';
-import { eventSource, event_types } from '../../../script.js';
+// ลบบรรทัด import ออกให้หมด แล้วใช้ตัวแปรที่ ST เตรียมไว้ให้
+const { 
+    getContext, 
+    extension_settings, 
+    saveSettingsDebounced 
+} = await import('../../../extensions.js');
+
+const { 
+    eventSource, 
+    event_types 
+} = await import('../../../../script.js');
 
 
 // --- Configuration ---
