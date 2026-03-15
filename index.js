@@ -1,163 +1,152 @@
-// ลบบรรทัด import ออกให้หมด แล้วใช้ตัวแปรที่ ST เตรียมไว้ให้
-const { 
-    getContext, 
-    extension_settings, 
-    saveSettingsDebounced 
-} = await import('../../../extensions.js');
+(async function() {
+    const { getContext, extension_settings, saveSettingsDebounced } = await import('../../../extensions.js');
+    const { eventSource, event_types } = await import('../../../../script.js');
 
-const { 
-    eventSource, 
-    event_types 
-} = await import('../../../../script.js');
+    const extensionName = "cold_system_tools";
+    const defaultSettings = {
+        enabled: true,
+        enableHtmlOptimizer: true,
+        placeholderText: "<code>[Content Optimized]</code>",
+    };
 
-// --- Configuration ---
-const extensionName = "cold_system_tools";
-const defaultSettings = {
-    enabled: true,
-    enableHtmlOptimizer: true,
-    placeholderText: "<code>[Content Optimized]</code>",
-};
-
-if (!extension_settings[extensionName]) {
-    extension_settings[extensionName] = Object.assign({}, defaultSettings);
-}
-
-// ฟังก์ชันดึงรูป User ที่รองรับทั้ง PC และ Mobile
-function getUserAvatar() {
-    // ลองดึงจากองค์ประกอบต่างๆ ที่ ST มักใช้เก็บรูป User
-    const imgSelectors = [
-        '#user_avatar_img', 
-        '#user_avatar', 
-        '.user-avatar img', 
-        'img.user-avatar'
-    ];
-    
-    for (let selector of imgSelectors) {
-        const src = $(selector).attr('src');
-        if (src) return src;
+    if (!extension_settings[extensionName]) {
+        extension_settings[extensionName] = Object.assign({}, defaultSettings);
     }
 
-    // ถ้าหาไม่เจอจริงๆ ให้ลองดึงจากแชทล่าสุดที่เป็นของ User
-    const lastUserMsg = $('.user-avatar').last().attr('src');
-    return lastUserMsg || '/img/User Avatar.png';
-}
+    // 1. Inject CSS เข้าสู่ Head โดยตรง (ธีมกระจกฝ้าฟ้าใส)
+    const style = `
+        <style>
+            #cold-ext-btn {
+                width: 30px; height: 30px; border-radius: 50%; 
+                background-color: #87ceeb;
+                background-size: cover; background-position: center;
+                border: 1px solid rgba(255, 255, 255, 0.5);
+                cursor: pointer; margin: 0 4px; flex-shrink: 0;
+                box-shadow: 0 1px 4px rgba(0,0,0,0.4); transition: 0.2s;
+            }
+            #cold-ext-btn:hover { transform: scale(1.1); filter: brightness(1.2); }
 
-function initUI() {
-    // ลบปุ่มเก่าออกก่อน (กันปุ่มซ้อนเวลาแก้โค้ด)
-    $('#cold-ext-btn').remove();
-
-    const avatarUrl = getUserAvatar();
-    const btnHtml = `<div id="cold-ext-btn" title="Cold Tools" style="
-        width: 30px; height: 30px; border-radius: 50%; 
-        background-color: rgba(135, 206, 235, 0.3);
-        background-image: url('${avatarUrl}'); 
-        background-size: cover; 
-        background-position: center;
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        display: inline-flex; justify-content: center; align-items: center; 
-        cursor: pointer; margin: 0 4px; flex-shrink: 0;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.4);"></div>`;
-    
-    // ย้ายมาแทรก "หลัง" ปุ่มไม้กายสิทธิ์ (#options_button)
-    // วิธีนี้จะทำให้มันอยู่ลำดับที่ 3 ต่อจากปุ่มขีดสาม และปุ่มไม้กายสิทธิ์
-    $('#options_button').after(btnHtml);
-
-    const modalHtml = `
-        <div id="cold-ext-modal">
-            <h4>System Search</h4>
-            <input type="number" id="cold-idx-input" placeholder="ใส่เลข Index..." 
-                style="width:100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(135, 206, 235, 0.4); color:white; padding:12px; border-radius:8px; margin-bottom:15px; box-sizing: border-box; outline:none;">
-            <div id="cold-preview" style="font-size:12px; color: #d1e8f0; margin-bottom:15px; height:45px; overflow:hidden; text-shadow: 0 1px 2px rgba(0,0,0,0.8); line-height:1.4;"></div>
-            
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                <button id="cold-copy" class="cold-btn-secondary">คัดลอก</button>
-                <button id="cold-token" class="cold-btn-secondary">เช็คโทเคน</button>
-                <button id="cold-branch" class="cold-btn-primary">แยกรูท</button>
-                <button id="cold-close" class="cold-btn-danger">ปิด</button>
-            </div>
-        </div>
+            #cold-ext-modal {
+                display: none; position: fixed; top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(135, 206, 235, 0.18); /* ฟ้าใสจางๆ */
+                backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 15px; padding: 20px; width: 85%; max-width: 320px;
+                z-index: 99999; box-shadow: 0 8px 32px rgba(0,0,0,0.3); color: white;
+            }
+            #cold-ext-modal h4 { margin: 0 0 15px 0; text-align: center; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+            #cold-ext-modal button { border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+            .cold-btn-primary { background: rgba(0, 150, 255, 0.4); }
+            .cold-btn-secondary { background: rgba(255, 255, 255, 0.2); }
+            .cold-btn-danger { background: rgba(255, 50, 50, 0.4); grid-column: span 2; margin-top: 10px; }
+        </style>
     `;
-    
-    if ($('#cold-ext-modal').length === 0) {
-        $('body').append(modalHtml);
+    $('head').append(style);
+
+    // 2. ฟังก์ชันหาภาพ Persona ของ User
+    function getUserAvatar() {
+        const selectors = [
+            '#user_avatar_img', 
+            '#user_avatar', 
+            '.user-avatar img', 
+            'img.user-avatar',
+            '#avatar_user'
+        ];
+        for (let s of selectors) {
+            let src = $(s).attr('src');
+            if (src && src !== '') return src;
+        }
+        // ถ้าหาไม่เจอจริงๆ ให้ดึงจากข้อความล่าสุดในแชท
+        return $('.user-avatar').last().attr('src') || '/img/User Avatar.png';
     }
 
-    // Event Handlers
-    $('#cold-ext-btn').on('click', () => {
-        const currentAvatar = getUserAvatar();
-        $('#cold-ext-btn').css('background-image', `url('${currentAvatar}')`);
-        $('#cold-ext-modal').fadeIn(200);
-    });
-    
-    $('#cold-close').on('click', () => $('#cold-ext-modal').fadeOut(200));
+    // 3. ฟังก์ชันสร้างปุ่มและจัดการตำแหน่ง
+    function injectButton() {
+        if ($('#cold-ext-btn').length > 0) return; // ถ้ามีปุ่มแล้วไม่ต้องสร้างซ้ำ
 
-    $('#cold-idx-input').on('input', function() {
-        const idx = parseInt($(this).val());
-        const chat = getContext().chat;
-        if (chat && chat[idx]) {
-            $('#cold-preview').text(chat[idx].mes.substring(0, 80) + "...");
+        const avatarUrl = getUserAvatar();
+        const btnHtml = `<div id="cold-ext-btn" title="Cold Tools" style="background-image: url('${avatarUrl}');"></div>`;
+        
+        // บังคับแทรก "หลัง" ปุ่มไม้กายสิทธิ์ (#options_button)
+        // เพื่อให้อยู่ลำดับที่ 3 ต่อจาก [เมนูขีดสาม] [ไม้กายสิทธิ์] [ปุ่มคุณ]
+        if ($('#options_button').length > 0) {
+            $('#options_button').after(btnHtml);
         } else {
-            $('#cold-preview').text("ไม่พบข้อความที่ Index นี้");
+            // กรณีหาปุ่มไม้กายสิทธิ์ไม่เจอ (เช่นโหลดช้า) ให้รอแป๊บเดียวแล้วลองใหม่
+            setTimeout(injectButton, 500);
+            return;
         }
-    });
 
-    $('#cold-copy').on('click', () => {
-        const idx = parseInt($('#cold-idx-input').val());
-        const chat = getContext().chat;
-        if (chat && chat[idx]) {
-            navigator.clipboard.writeText(chat[idx].mes);
-            toastr.success('คัดลอกข้อความแล้ว');
-        }
-    });
-
-    $('#cold-token').on('click', () => {
-        const idx = parseInt($('#cold-idx-input').val());
-        const chat = getContext().chat;
-        if (chat && chat[idx]) {
-            alert(`ข้อความนี้ยาวประมาณ: ${chat[idx].mes.length} ตัวอักษร`);
-        }
-    });
-
-    $('#cold-branch').on('click', async () => {
-        const idx = parseInt($('#cold-idx-input').val());
-        if (confirm(`ยืนยันการตัดแชทที่ Index ${idx}? ข้อความหลังจากนี้จะหายไปทั้งหมด`)) {
-            const context = getContext();
-            context.chat.splice(idx + 1);
-            await context.saveChat();
-            window.location.reload();
-        }
-    });
-}
-
-function setupSettings() {
-    const html = `
-        <div class="cold-settings-container">
-            <div class="inline-drawer">
-                <div class="inline-drawer-header"><b>Cold System Tools</b></div>
-                <div class="inline-drawer-content">
-                    <label><input type="checkbox" id="cold_opt_toggle" ${extension_settings[extensionName].enableHtmlOptimizer ? 'checked' : ''}> เปิด Token Optimizer</label>
+        // จัดการ Modal
+        if ($('#cold-ext-modal').length === 0) {
+            const modalHtml = `
+                <div id="cold-ext-modal">
+                    <h4>System Search</h4>
+                    <input type="number" id="cold-idx-input" placeholder="Index..." style="width:100%; background:rgba(0,0,0,0.3); border:1px solid white; color:white; padding:10px; border-radius:8px; margin-bottom:15px; box-sizing:border-box;">
+                    <div id="cold-preview" style="font-size:12px; height:45px; overflow:hidden; opacity:0.8; margin-bottom:10px;"></div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <button id="cold-copy" class="cold-btn-secondary">คัดลอก</button>
+                        <button id="cold-token" class="cold-btn-secondary">เช็คโทเคน</button>
+                        <button id="cold-branch" class="cold-btn-primary">แยกรูท</button>
+                        <button id="cold-close" class="cold-btn-danger">ปิด</button>
+                    </div>
                 </div>
-            </div>
-        </div>
-    `;
-    $('#extensions_settings').append(html);
-    $('#cold_opt_toggle').on('change', function() {
-        extension_settings[extensionName].enableHtmlOptimizer = !!$(this).prop('checked');
-        saveSettingsDebounced();
-    });
-}
+            `;
+            $('body').append(modalHtml);
+        }
 
-eventSource.on(event_types.MAKE_PROMPT, (args) => {
-    if (extension_settings[extensionName].enableHtmlOptimizer && args.chat) {
-        args.chat.forEach(msg => {
-            if (msg.mes && msg.mes.includes('<code>')) {
-                msg.mes = msg.mes.replace(/<code>[\s\S]*?<\/code>/g, extension_settings[extensionName].placeholderText);
+        // Event Handlers
+        $('#cold-ext-btn').off('click').on('click', () => {
+            $('#cold-ext-btn').css('background-image', `url('${getUserAvatar()}')`);
+            $('#cold-ext-modal').fadeIn(200);
+        });
+        $('#cold-close').on('click', () => $('#cold-ext-modal').fadeOut(200));
+        
+        $('#cold-idx-input').on('input', function() {
+            const idx = parseInt($(this).val());
+            const chat = getContext().chat;
+            if (chat && chat[idx]) $('#cold-preview').text(chat[idx].mes.substring(0, 60) + "...");
+            else $('#cold-preview').text("ไม่พบข้อความ");
+        });
+
+        $('#cold-copy').on('click', () => {
+            const idx = parseInt($('#cold-idx-input').val());
+            const chat = getContext().chat;
+            if (chat && chat[idx]) { navigator.clipboard.writeText(chat[idx].mes); toastr.success('Copied!'); }
+        });
+
+        $('#cold-branch').on('click', async () => {
+            const idx = parseInt($('#cold-idx-input').val());
+            if (confirm(`ตัดแชทที่ Index ${idx}?`)) {
+                getContext().chat.splice(idx + 1);
+                await getContext().saveChat();
+                window.location.reload();
             }
         });
     }
-});
 
-jQuery(async () => {
-    initUI();
-    setupSettings();
-});
+    // ส่วนของ Token Optimizer
+    eventSource.on(event_types.MAKE_PROMPT, (args) => {
+        if (extension_settings[extensionName].enableHtmlOptimizer && args.chat) {
+            args.chat.forEach(msg => {
+                if (msg.mes && msg.mes.includes('<code>')) {
+                    msg.mes = msg.mes.replace(/<code>[\s\S]*?<\/code>/g, extension_settings[extensionName].placeholderText);
+                }
+            });
+        }
+    });
+
+    // เริ่มการทำงาน
+    jQuery(async () => {
+        // ใช้ Interval ตรวจสอบตำแหน่งปุ่มเรื่อยๆ ในช่วงแรก (ป้องกันโดน ST ย้ายกลับ)
+        let checks = 0;
+        const posInterval = setInterval(() => {
+            injectButton();
+            checks++;
+            if (checks > 10) clearInterval(posInterval); // ตรวจสอบ 10 ครั้งแล้วหยุด
+        }, 1000);
+
+        console.log("Cold Tools Loaded.");
+    });
+})();
