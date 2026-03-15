@@ -23,16 +23,19 @@ if (!extension_settings[extensionName]) {
     extension_settings[extensionName] = Object.assign({}, defaultSettings);
 }
 
-// ฟังก์ชันสำหรับดึงรูป User Persona ปัจจุบันจากหน้าแชท
+// ฟังก์ชันสำหรับดึงรูป User Persona ปัจจุบัน
 function getUserAvatar() {
-    // พยายามดึงรูปจากข้อความของ User ในแชท หรือใช้รูปพื้นฐานถ้าหาไม่พบ
-    return $('.user-avatar').last().attr('src') || '/img/User Avatar.png';
+    // ดึงจากรูป Persona ปัจจุบันที่เลือกไว้ใน UI ของ SillyTavern ก่อน 
+    // ถ้าไม่มีค่อยดึงจากแชทล่าสุด หรือใช้รูปพื้นฐาน
+    let personaImg = $('#user_avatar').attr('src') || $('#avatar_user').attr('src');
+    let chatImg = $('.user-avatar').last().attr('src');
+    
+    return personaImg || chatImg || '/img/User Avatar.png';
 }
 
 // --- UI Logic: Search & Actions ---
 function initUI() {
     // 1. สร้างปุ่มวงกลม
-    // ใช้ getUserAvatar() เพื่อดึงรูปโปรไฟล์มาแสดงเป็นพื้นหลัง
     const avatarUrl = getUserAvatar();
     const btnHtml = `<div id="cold-ext-btn" title="Cold Tools" style="
         width: 28px; height: 28px; border-radius: 50%; 
@@ -45,13 +48,13 @@ function initUI() {
         cursor: pointer; margin: 0 5px; flex-shrink: 0;
         box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>`;
     
-    // แทรกปุ่มไว้ "หลัง" ปุ่มไม้กายสิทธิ์ (#options_button) เพื่อให้เป็นเครื่องมือที่ 3
-    $('#options_button').after(btnHtml);
+    // แทรกปุ่มไว้ "หน้า" ปุ่มไม้กายสิทธิ์ (#options_button) เพื่อให้เป็นเครื่องมือแรกสุด
+    $('#options_button').before(btnHtml);
 
     // 2. สร้าง Modal สำหรับจัดการข้อความ (ธีมกระจกฝ้า ฟ้าใสจางๆ)
     const modalHtml = `
         <div id="cold-ext-modal">
-            <h4 style="margin:0 0 15px 0; color: #b6e0f0; border-bottom: 1px solid rgba(135, 206, 235, 0.3); padding-bottom: 10px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">System Search</h4>
+            <h4>System Search</h4>
             <input type="number" id="cold-idx-input" placeholder="ใส่เลข Index..." 
                 style="width:100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(135, 206, 235, 0.4); color:white; padding:10px; border-radius:8px; margin-bottom:15px; box-sizing: border-box;">
             <div id="cold-preview" style="font-size:12px; color: #d1e8f0; margin-bottom:15px; height:45px; overflow:hidden; text-shadow: 0 1px 2px rgba(0,0,0,0.8);"></div>
@@ -68,7 +71,7 @@ function initUI() {
 
     // Event Handlers
     $('#cold-ext-btn').on('click', () => {
-        // อัปเดตรูปภาพอีกครั้งเผื่อมีการเปลี่ยนตัวละคร
+        // อัปเดตรูปภาพอีกครั้งเผื่อมีการเปลี่ยนตัวละคร User
         $('#cold-ext-btn').css('background-image', `url('${getUserAvatar()}')`);
         $('#cold-ext-modal').fadeIn(200);
     });
