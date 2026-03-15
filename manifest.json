@@ -1,9 +1,9 @@
 {
-    "name": "Cold System Tools",
+    "name": "cold_system_tools",
     "display_name": "Cold System Tools",
     "version": "1.0.0",
-    "description": "Search, Branch, and HTML Token Optimizer",
+    "description": "Search and Token Optimizer",
     "author": "Cyrus",
-    "js": "index.js"
+    "js": "index.js",
+    "css": "style.css"
 }
-
