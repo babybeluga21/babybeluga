@@ -17,24 +17,36 @@
     left: 50%;
     transform: translate(-50%, -50%);
     
-    /* หัวใจหลักของธีมกระจกมัว (Glassmorphism) */
-    background: rgba(30, 60, 90, 0.35); /* สีน้ำเงิน/เทาฟ้า โปร่งใสจางๆ */
-    backdrop-filter: blur(12px); /* ทำให้พื้นหลังมัว */
-    -webkit-backdrop-filter: blur(12px); /* สำหรับเบราว์เซอร์ตระกูล Webkit */
+    /* ธีมกระจกมัวฟ้าใสจางๆ (Glassmorphism) */
+    background: rgba(135, 206, 235, 0.15); /* สีฟ้าใสจางๆ (Sky Blue) opacity แค่ 15% */
+    backdrop-filter: blur(16px); /* ทำให้พื้นหลังมัวชัดเจน */
+    -webkit-backdrop-filter: blur(16px); 
     
-    border: 1px solid rgba(135, 206, 235, 0.3); /* ขอบสีฟ้าจางๆ ให้ดูเป็นแผ่นกระจก */
+    border: 1px solid rgba(255, 255, 255, 0.3); /* ขอบกระจก */
     border-radius: 12px;
     padding: 20px;
     width: 300px;
     z-index: 10001;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 0 10px rgba(255, 255, 255, 0.05);
-    color: #e2e8f0;
+    
+    /* แสงเงาให้ดูมีมิติเป็นกระจกสว่าง */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 
+                inset 0 0 15px rgba(255, 255, 255, 0.2);
+    color: #f1f5f9;
     font-family: sans-serif;
+}
+
+/* ส่วนหัว (Header) */
+#cold-ext-modal h4 {
+    margin: 0 0 15px 0; 
+    color: #ffffff; 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2); 
+    padding-bottom: 10px; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
 }
 
 /* ปุ่มใน Modal */
 #cold-ext-modal button {
-    border: 1px solid rgba(255, 255, 255, 0.1); /* เพิ่มเส้นขอบบางๆ ให้ปุ่ม */
+    border: 1px solid rgba(255, 255, 255, 0.1); 
     padding: 10px 15px;
     margin: 0;
     border-radius: 8px;
