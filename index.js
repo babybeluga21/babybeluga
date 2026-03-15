@@ -10,7 +10,6 @@ const {
     event_types 
 } = await import('../../../../script.js');
 
-
 // --- Configuration ---
 const extensionName = "cold_system_tools";
 const defaultSettings = {
@@ -24,39 +23,38 @@ if (!extension_settings[extensionName]) {
     extension_settings[extensionName] = Object.assign({}, defaultSettings);
 }
 
+// ฟังก์ชันสำหรับดึงรูป User Persona ปัจจุบันจากหน้าแชท
+function getUserAvatar() {
+    // พยายามดึงรูปจากข้อความของ User ในแชท หรือใช้รูปพื้นฐานถ้าหาไม่พบ
+    return $('.user-avatar').last().attr('src') || '/img/User Avatar.png';
+}
+
 // --- UI Logic: Search & Actions ---
 function initUI() {
-    // 1. สร้างปุ่มวงกลม (สีฟ้าเย็น) ในแถบข้อความ
-    // เลือกตำแหน่งข้างปุ่มไม้กายสิทธิ์ (#options_button)
-    // ปรับขนาดให้เล็กลง (28px) และเปลี่ยนไอคอนเป็นรูปตัวละคร {{user}}
+    // 1. สร้างปุ่มวงกลม
+    // ใช้ getUserAvatar() เพื่อดึงรูปโปรไฟล์มาแสดงเป็นพื้นหลัง
+    const avatarUrl = getUserAvatar();
     const btnHtml = `<div id="cold-ext-btn" title="Cold Tools" style="
         width: 28px; height: 28px; border-radius: 50%; 
-        background-color: rgba(173, 216, 230, 0.5); /* สีฟ้าใสโปร่งใส */
-        color: white; 
+        background-color: rgba(135, 206, 235, 0.3);
+        background-image: url('${avatarUrl}'); 
+        background-size: cover; 
+        background-position: center;
+        border: 1px solid rgba(255, 255, 255, 0.4);
         display: inline-flex; justify-content: center; align-items: center; 
-        cursor: pointer; margin: 0 5px; flex-shrink: 0; font-size: 12px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        background-image: url('{{user}}'); background-size: cover; background-position: center; /* ใช้รูปตัวละคร */
-        border: 1px solid rgba(255, 255, 255, 0.3); /* เส้นขอบบางๆ */
-        "></div>`;
+        cursor: pointer; margin: 0 5px; flex-shrink: 0;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>`;
     
-    // ย้ายไปเป็นเครื่องมือตำแหน่งที่สาม
-    // แทรกก่อนปุ่มที่สาม (#send_but)
-    $('#send_but').before(btnHtml);
+    // แทรกปุ่มไว้ "หลัง" ปุ่มไม้กายสิทธิ์ (#options_button) เพื่อให้เป็นเครื่องมือที่ 3
+    $('#options_button').after(btnHtml);
 
-    // 2. สร้าง Modal สำหรับจัดการข้อความ (ธีมใหม่)
+    // 2. สร้าง Modal สำหรับจัดการข้อความ (ธีมกระจกฝ้า ฟ้าใสจางๆ)
     const modalHtml = `
-        <div id="cold-ext-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); 
-            background: rgba(42, 50, 56, 0.8); /* สีเทาอมฟ้าเข้มแบบโปร่งใส */
-            border: 1px solid rgba(173, 216, 230, 0.4); /* เส้นขอบสีฟ้าใสบางๆ */
-            border-radius: 12px; padding: 20px; width: 300px; z-index: 10001; 
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4); /* เงาแบบ Soft */
-            backdrop-filter: blur(10px); /* เอฟเฟกต์เบลอพื้นหลัง */
-            color: #e2e8f0; font-family: sans-serif;">
-            <h4 style="margin:0 0 15px 0; color: #add8e6; border-bottom: 1px solid rgba(173, 216, 230, 0.2); padding-bottom: 10px;">System Search</h4>
+        <div id="cold-ext-modal">
+            <h4 style="margin:0 0 15px 0; color: #b6e0f0; border-bottom: 1px solid rgba(135, 206, 235, 0.3); padding-bottom: 10px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">System Search</h4>
             <input type="number" id="cold-idx-input" placeholder="ใส่เลข Index..." 
-                style="width:100%; background: rgba(30, 36, 40, 0.7); border: 1px solid rgba(173, 216, 230, 0.3); color:white; padding:10px; border-radius:8px; margin-bottom:15px; box-sizing: border-box;">
-            <div id="cold-preview" style="font-size:12px; color: #a0aec0; margin-bottom:15px; height:45px; overflow:hidden;"></div>
+                style="width:100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(135, 206, 235, 0.4); color:white; padding:10px; border-radius:8px; margin-bottom:15px; box-sizing: border-box;">
+            <div id="cold-preview" style="font-size:12px; color: #d1e8f0; margin-bottom:15px; height:45px; overflow:hidden; text-shadow: 0 1px 2px rgba(0,0,0,0.8);"></div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                 <button id="cold-copy" class="cold-btn-secondary">คัดลอก</button>
@@ -69,7 +67,12 @@ function initUI() {
     $('body').append(modalHtml);
 
     // Event Handlers
-    $('#cold-ext-btn').on('click', () => $('#cold-ext-modal').fadeIn(200));
+    $('#cold-ext-btn').on('click', () => {
+        // อัปเดตรูปภาพอีกครั้งเผื่อมีการเปลี่ยนตัวละคร
+        $('#cold-ext-btn').css('background-image', `url('${getUserAvatar()}')`);
+        $('#cold-ext-modal').fadeIn(200);
+    });
+    
     $('#cold-close').on('click', () => $('#cold-ext-modal').fadeOut(200));
 
     // Preview เมื่อพิมพ์ตัวเลข
@@ -117,7 +120,7 @@ async function deleteMessagesFromIndex(index) {
     if (index < context.chat.length) {
         context.chat.splice(index);
         await context.saveChat();
-        window.location.reload(); // รีโหลดเพื่อให้ UI อัปเดตแชทที่ถูกตัด
+        window.location.reload(); 
     }
 }
 
@@ -156,7 +159,6 @@ function setupSettings() {
 }
 
 // --- Core Logic: Token Optimizer ---
-// ดักจับก่อนที่ Prompt จะถูกส่งไปยัง AI API
 eventSource.on(event_types.MAKE_PROMPT, (args) => {
     if (!extension_settings[extensionName].enableHtmlOptimizer) return;
 
