@@ -1,9 +1,6 @@
-import { 
-    getContext, 
-    extension_settings, 
-    saveSettingsDebounced 
-} from '../../../../extensions.js';
-import { eventSource, event_types } from '../../../../script.js';
+import { getContext, extension_settings, saveSettingsDebounced } from '../../extensions.js';
+import { eventSource, event_types } from '../../../script.js';
+
 
 // --- Configuration ---
 const extensionName = "cold_system_tools";
