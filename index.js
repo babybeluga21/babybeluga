@@ -18,46 +18,56 @@ const defaultSettings = {
     placeholderText: "<code>[Content Optimized]</code>",
 };
 
-// Load or Initialize Settings
 if (!extension_settings[extensionName]) {
     extension_settings[extensionName] = Object.assign({}, defaultSettings);
 }
 
-// ฟังก์ชันสำหรับดึงรูป User Persona ปัจจุบัน
+// ฟังก์ชันดึงรูป User ที่รองรับทั้ง PC และ Mobile
 function getUserAvatar() {
-    // ดึงจากรูป Persona ปัจจุบันที่เลือกไว้ใน UI ของ SillyTavern ก่อน 
-    // ถ้าไม่มีค่อยดึงจากแชทล่าสุด หรือใช้รูปพื้นฐาน
-    let personaImg = $('#user_avatar').attr('src') || $('#avatar_user').attr('src');
-    let chatImg = $('.user-avatar').last().attr('src');
+    // ลองดึงจากองค์ประกอบต่างๆ ที่ ST มักใช้เก็บรูป User
+    const imgSelectors = [
+        '#user_avatar_img', 
+        '#user_avatar', 
+        '.user-avatar img', 
+        'img.user-avatar'
+    ];
     
-    return personaImg || chatImg || '/img/User Avatar.png';
+    for (let selector of imgSelectors) {
+        const src = $(selector).attr('src');
+        if (src) return src;
+    }
+
+    // ถ้าหาไม่เจอจริงๆ ให้ลองดึงจากแชทล่าสุดที่เป็นของ User
+    const lastUserMsg = $('.user-avatar').last().attr('src');
+    return lastUserMsg || '/img/User Avatar.png';
 }
 
-// --- UI Logic: Search & Actions ---
 function initUI() {
-    // 1. สร้างปุ่มวงกลม
+    // ลบปุ่มเก่าออกก่อน (กันปุ่มซ้อนเวลาแก้โค้ด)
+    $('#cold-ext-btn').remove();
+
     const avatarUrl = getUserAvatar();
     const btnHtml = `<div id="cold-ext-btn" title="Cold Tools" style="
-        width: 28px; height: 28px; border-radius: 50%; 
+        width: 30px; height: 30px; border-radius: 50%; 
         background-color: rgba(135, 206, 235, 0.3);
         background-image: url('${avatarUrl}'); 
         background-size: cover; 
         background-position: center;
-        border: 1px solid rgba(255, 255, 255, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.5);
         display: inline-flex; justify-content: center; align-items: center; 
-        cursor: pointer; margin: 0 5px; flex-shrink: 0;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>`;
+        cursor: pointer; margin: 0 4px; flex-shrink: 0;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);"></div>`;
     
-    // แทรกปุ่มไว้ "หน้า" ปุ่มไม้กายสิทธิ์ (#options_button) เพื่อให้เป็นเครื่องมือแรกสุด
-    $('#options_button').before(btnHtml);
+    // ย้ายมาแทรก "หลัง" ปุ่มไม้กายสิทธิ์ (#options_button)
+    // วิธีนี้จะทำให้มันอยู่ลำดับที่ 3 ต่อจากปุ่มขีดสาม และปุ่มไม้กายสิทธิ์
+    $('#options_button').after(btnHtml);
 
-    // 2. สร้าง Modal สำหรับจัดการข้อความ (ธีมกระจกฝ้า ฟ้าใสจางๆ)
     const modalHtml = `
         <div id="cold-ext-modal">
             <h4>System Search</h4>
             <input type="number" id="cold-idx-input" placeholder="ใส่เลข Index..." 
-                style="width:100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(135, 206, 235, 0.4); color:white; padding:10px; border-radius:8px; margin-bottom:15px; box-sizing: border-box;">
-            <div id="cold-preview" style="font-size:12px; color: #d1e8f0; margin-bottom:15px; height:45px; overflow:hidden; text-shadow: 0 1px 2px rgba(0,0,0,0.8);"></div>
+                style="width:100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(135, 206, 235, 0.4); color:white; padding:12px; border-radius:8px; margin-bottom:15px; box-sizing: border-box; outline:none;">
+            <div id="cold-preview" style="font-size:12px; color: #d1e8f0; margin-bottom:15px; height:45px; overflow:hidden; text-shadow: 0 1px 2px rgba(0,0,0,0.8); line-height:1.4;"></div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                 <button id="cold-copy" class="cold-btn-secondary">คัดลอก</button>
@@ -67,105 +77,78 @@ function initUI() {
             </div>
         </div>
     `;
-    $('body').append(modalHtml);
+    
+    if ($('#cold-ext-modal').length === 0) {
+        $('body').append(modalHtml);
+    }
 
     // Event Handlers
     $('#cold-ext-btn').on('click', () => {
-        // อัปเดตรูปภาพอีกครั้งเผื่อมีการเปลี่ยนตัวละคร User
-        $('#cold-ext-btn').css('background-image', `url('${getUserAvatar()}')`);
+        const currentAvatar = getUserAvatar();
+        $('#cold-ext-btn').css('background-image', `url('${currentAvatar}')`);
         $('#cold-ext-modal').fadeIn(200);
     });
     
     $('#cold-close').on('click', () => $('#cold-ext-modal').fadeOut(200));
 
-    // Preview เมื่อพิมพ์ตัวเลข
     $('#cold-idx-input').on('input', function() {
         const idx = parseInt($(this).val());
         const chat = getContext().chat;
-        if (chat[idx]) {
-            $('#cold-preview').text(chat[idx].mes.substring(0, 60) + "...");
+        if (chat && chat[idx]) {
+            $('#cold-preview').text(chat[idx].mes.substring(0, 80) + "...");
         } else {
-            $('#cold-preview').text("ไม่พบข้อความ");
+            $('#cold-preview').text("ไม่พบข้อความที่ Index นี้");
         }
     });
 
-    // Action: Copy
     $('#cold-copy').on('click', () => {
         const idx = parseInt($('#cold-idx-input').val());
         const chat = getContext().chat;
-        if (chat[idx]) {
+        if (chat && chat[idx]) {
             navigator.clipboard.writeText(chat[idx].mes);
-            toastr.success('Copied to clipboard');
+            toastr.success('คัดลอกข้อความแล้ว');
         }
     });
 
-    // Action: Token Check
-    $('#cold-token').on('click', async () => {
+    $('#cold-token').on('click', () => {
         const idx = parseInt($('#cold-idx-input').val());
         const chat = getContext().chat;
-        if (chat[idx]) {
-            alert(`ข้อความนี้มีประมาณ ${Math.floor(chat[idx].mes.length / 4)} โทเคน (โดยประมาณ)`);
+        if (chat && chat[idx]) {
+            alert(`ข้อความนี้ยาวประมาณ: ${chat[idx].mes.length} ตัวอักษร`);
         }
     });
 
-    // Action: Branch (แยกรูท)
     $('#cold-branch').on('click', async () => {
         const idx = parseInt($('#cold-idx-input').val());
-        if (confirm(`คุณต้องการแยกรูทจากข้อความที่ ${idx} ใช่ไหม? (ข้อความหลังจากนี้จะถูกลบ)`)) {
-            await deleteMessagesFromIndex(idx + 1);
-            $('#cold-ext-modal').fadeOut(200);
+        if (confirm(`ยืนยันการตัดแชทที่ Index ${idx}? ข้อความหลังจากนี้จะหายไปทั้งหมด`)) {
+            const context = getContext();
+            context.chat.splice(idx + 1);
+            await context.saveChat();
+            window.location.reload();
         }
     });
 }
 
-async function deleteMessagesFromIndex(index) {
-    const context = getContext();
-    if (index < context.chat.length) {
-        context.chat.splice(index);
-        await context.saveChat();
-        window.location.reload(); 
-    }
-}
-
-// --- UI Logic: Settings Menu ---
 function setupSettings() {
     const html = `
         <div class="cold-settings-container">
             <div class="inline-drawer">
-                <div class="inline-drawer-header">
-                    <b>Cold System Tools</b>
-                </div>
+                <div class="inline-drawer-header"><b>Cold System Tools</b></div>
                 <div class="inline-drawer-content">
-                    <div class="flex-container">
-                        <label for="cold_opt_toggle">เปิดระบบ Token Optimizer (ซ่อน HTML &lt;code&gt;)</label>
-                        <input type="checkbox" id="cold_opt_toggle" ${extension_settings[extensionName].enableHtmlOptimizer ? 'checked' : ''}>
-                    </div>
-                    <div style="margin-top:10px;">
-                        <label>คำที่จะแสดงแทนโค้ด:</label>
-                        <input type="text" id="cold_placeholder" class="text_box" value="${extension_settings[extensionName].placeholderText}">
-                    </div>
+                    <label><input type="checkbox" id="cold_opt_toggle" ${extension_settings[extensionName].enableHtmlOptimizer ? 'checked' : ''}> เปิด Token Optimizer</label>
                 </div>
             </div>
         </div>
     `;
     $('#extensions_settings').append(html);
-
     $('#cold_opt_toggle').on('change', function() {
         extension_settings[extensionName].enableHtmlOptimizer = !!$(this).prop('checked');
         saveSettingsDebounced();
     });
-
-    $('#cold_placeholder').on('input', function() {
-        extension_settings[extensionName].placeholderText = $(this).val();
-        saveSettingsDebounced();
-    });
 }
 
-// --- Core Logic: Token Optimizer ---
 eventSource.on(event_types.MAKE_PROMPT, (args) => {
-    if (!extension_settings[extensionName].enableHtmlOptimizer) return;
-
-    if (args && args.chat) {
+    if (extension_settings[extensionName].enableHtmlOptimizer && args.chat) {
         args.chat.forEach(msg => {
             if (msg.mes && msg.mes.includes('<code>')) {
                 msg.mes = msg.mes.replace(/<code>[\s\S]*?<\/code>/g, extension_settings[extensionName].placeholderText);
@@ -174,9 +157,7 @@ eventSource.on(event_types.MAKE_PROMPT, (args) => {
     }
 });
 
-// --- Entry Point ---
 jQuery(async () => {
     initUI();
     setupSettings();
-    console.log("Cold System Tools Extension Loaded.");
 });
