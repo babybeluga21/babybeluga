@@ -1,9 +1,9 @@
 {
-    "name": "cold_system_tools",
-    "display_name": "Cold System Tools",
-    "version": "1.0.0",
-    "description": "Search and Token Optimizer",
-    "author": "Cyrus",
-    "js": "index.js",
-    "css": "style.css"
+  "display_name": "Cute HTML Renderer (Token Saver)",
+  "js": "index.js",
+  "css": "style.css",
+  "author": "Grok + Urjdjd",
+  "version": "1.0",
+  "loading_order": 10,
+  "homePage": "https://ko-fi.com/radeish"
 }
