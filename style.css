@@ -1,101 +1,59 @@
-/* ปุ่มทรงกลมข้างกล่องข้อความ */
-#cold-ext-btn {
+#cute-html-panel {
+    position: fixed;
+    right: 25px;
+    top: 120px;
+    width: 320px;
+    background: #f8e4c9;
+    border: 6px solid #d48c3d;
+    border-radius: 25px;
+    box-shadow: 0 15px 30px rgba(212, 140, 61, 0.3);
+    z-index: 99999;
+    font-family: "Segoe UI", sans-serif;
+    overflow: hidden;
     transition: all 0.3s ease;
 }
 
-#cold-ext-btn:hover {
-    transform: scale(1.1); 
-    box-shadow: 0 0 8px rgba(135, 206, 235, 0.6); /* เรืองแสงสีฟ้าตอนชี้ */
-    border-color: rgba(255, 255, 255, 0.8) !important;
-}
-
-/* หน้าต่าง Modal ระบบค้นหา (กระจกฝ้า สีฟ้าใสจางๆ) */
-#cold-ext-modal {
-    display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    
-    /* ธีมกระจกมัวฟ้าใสจางๆ (Glassmorphism) */
-    background: rgba(135, 206, 235, 0.15); /* สีฟ้าใสจางๆ (Sky Blue) opacity แค่ 15% */
-    backdrop-filter: blur(16px); /* ทำให้พื้นหลังมัวชัดเจน */
-    -webkit-backdrop-filter: blur(16px); 
-    
-    border: 1px solid rgba(255, 255, 255, 0.3); /* ขอบกระจก */
-    border-radius: 12px;
-    padding: 20px;
-    width: 300px;
-    z-index: 10001;
-    
-    /* แสงเงาให้ดูมีมิติเป็นกระจกสว่าง */
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 
-                inset 0 0 15px rgba(255, 255, 255, 0.2);
-    color: #f1f5f9;
-    font-family: sans-serif;
-}
-
-/* ส่วนหัว (Header) */
-#cold-ext-modal h4 {
-    margin: 0 0 15px 0; 
-    color: #ffffff; 
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2); 
-    padding-bottom: 10px; 
-    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
-}
-
-/* ปุ่มใน Modal */
-#cold-ext-modal button {
-    border: 1px solid rgba(255, 255, 255, 0.1); 
-    padding: 10px 15px;
-    margin: 0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 13px;
-    font-weight: bold;
+#cute-html-header {
+    background: linear-gradient(#ffcc80, #d48c3d);
     color: white;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    padding: 12px 15px;
+    font-weight: bold;
+    font-size: 18px;
+    text-align: center;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 4px solid #b36b2e;
 }
 
-#cold-ext-modal button:active {
-    transform: scale(0.96); 
+#cute-html-header::before {
+    content: "📅";
+    font-size: 24px;
 }
 
-/* ปุ่มหลัก (แยกรูท) - ฟ้าใสแบบเจล */
-#cold-ext-modal .cold-btn-primary {
-    background: rgba(74, 144, 226, 0.4); 
+#cute-html-body {
+    padding: 15px;
+    color: #5c4033;
 }
 
-#cold-ext-modal .cold-btn-primary:hover {
-    background: rgba(74, 144, 226, 0.6); 
-    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+.st-html-rendered {
+    border: 5px solid #d48c3d;
+    background: #fffaf0;
+    padding: 15px;
+    border-radius: 18px;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+    margin: 12px 0;
+    position: relative;
+    overflow: hidden;
 }
 
-/* ปุ่มรอง (คัดลอก, เช็คโทเคน) - เทาอมฟ้าโปร่งใส */
-#cold-ext-modal .cold-btn-secondary {
-    background: rgba(100, 116, 139, 0.4); 
-}
-
-#cold-ext-modal .cold-btn-secondary:hover {
-    background: rgba(100, 116, 139, 0.6);
-}
-
-/* ปุ่มปิด - แดงอมเทาโปร่งใส */
-#cold-ext-modal .cold-btn-danger {
-    background: rgba(200, 70, 70, 0.4); 
-    grid-column: span 2; 
-    margin-top: 10px;
-}
-
-#cold-ext-modal .cold-btn-danger:hover {
-    background: rgba(200, 70, 70, 0.6); 
-}
-
-/* กล่องข้อความค้นหา (Input) */
-#cold-ext-modal input:focus {
-    outline: none;
-    border-color: rgba(135, 206, 235, 0.8) !important;
-    background: rgba(0, 0, 0, 0.5) !important;
-    box-shadow: 0 0 5px rgba(135, 206, 235, 0.3);
+.st-html-rendered::before {
+    content: "☆";
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    font-size: 40px;
+    color: #ffcc80;
+    opacity: 0.3;
 }
