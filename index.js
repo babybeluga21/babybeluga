@@ -1,149 +1,149 @@
-import { extension_settings, getContext } from "../../../extensions.js";
-import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
+import { getContext, eventSource, event_types } from '../../../extensions.js';
 
-const MODULE_NAME = "cute-html-renderer";
-let htmlStorageEnabled = true;
+const MODULE_NAME = 'cute-html-extractor';
+const context = getContext();
 
-// สร้างแผงลอยน่ารักฝั่งขวา (ขยับได้ + มีฐาน)
-function createFloatingPanel() {
-    const panel = document.createElement("div");
-    panel.id = "cute-html-panel";
+let extractedStore = new Map(); // เก็บ HTML ตาม message id
+
+// ====================== ระบบดึง HTML + ประหยัด Token ======================
+function extractHTML(message) {
+  let text = message.mes || '';
+  const htmlBlocks = [];
+  
+  // ดักโค้ด HTML (ทั้ง raw และ fenced) ให้ครอบคลุมภาพทุกแบบ
+  const regex = /(<(?:div|span|table|img|button|form|iframe|svg|canvas)[^>]*>[\s\S]*?<\/\w+>)|```html\s*([\s\S]*?)\s*```/gi;
+  
+  let match;
+  let index = 0;
+  
+  while ((match = regex.exec(text)) !== null) {
+    const fullBlock = match[0];
+    const cleanHtml = match[1] || match[2] || fullBlock;
+    
+    htmlBlocks.push(cleanHtml.trim());
+    
+    // แทนที่ด้วย <code> ตามที่ต้องการ (middle เป็นตัวเลขล้วนๆ)
+    const placeholder = `<code class="st-html-placeholder" data-index="\( {index}"> \){index + 1}</code>`;
+    text = text.replace(fullBlock, placeholder);
+    
+    index++;
+  }
+  
+  if (htmlBlocks.length > 0) {
+    message.mes = text;                    // ประวัติสั้นลง = Token 节省
+    message.extractedHtml = htmlBlocks;    // เก็บโค้ดจริง
+    extractedStore.set(message.mesid || Date.now(), htmlBlocks);
+  }
+}
+
+// ====================== แสดงผลในแชท (แทนที่ <code> ด้วย HTML จริง) ======================
+eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (message) => {
+  if (!message.extractedHtml || message.extractedHtml.length === 0) return;
+  
+  const mesElement = document.querySelector(`.mes[mesid="${message.mesid}"]`) ||
+                     document.querySelector(`[data-message-id="${message.mesid}"]`);
+  
+  if (!mesElement) return;
+  
+  const placeholders = mesElement.querySelectorAll('code.st-html-placeholder');
+  
+  placeholders.forEach((code) => {
+    const idx = parseInt(code.getAttribute('data-index'));
+    const html = message.extractedHtml[idx];
+    if (html) {
+      const sanitized = SillyTavern.libs.DOMPurify.sanitize(html);
+      code.outerHTML = sanitized;   // แสดงผลน่ารักตามภาพเลย!
+    }
+  });
+});
+
+// ====================== ดักตอน AI ตอบ ======================
+eventSource.on(event_types.MESSAGE_RECEIVED, (message) => {
+  if (message.is_user) return;
+  extractHTML(message);
+});
+
+// ====================== ปุ่มลอยน่ารัก (ขยับได้ + ฐาน) ======================
+eventSource.on(event_types.APP_READY, () => {
+  // ปุ่มหลัก (ดาว + สมุด)
+  const btn = document.createElement('div');
+  btn.id = 'cute-html-button';
+  btn.innerHTML = '⭐📖';
+  document.body.appendChild(btn);
+
+  // ลากได้
+  let isDragging = false;
+  let offsetX, offsetY;
+  
+  btn.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    offsetX = e.clientX - btn.getBoundingClientRect().left;
+    offsetY = e.clientY - btn.getBoundingClientRect().top;
+    btn.style.cursor = 'grabbing';
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    btn.style.right = 'auto';
+    btn.style.left = `${e.clientX - offsetX}px`;
+    btn.style.bottom = 'auto';
+    btn.style.top = `${e.clientY - offsetY}px`;
+  });
+  
+  document.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    btn.style.cursor = 'grab';
+    
+    // ฐานหยุด (ดึงกลับขวาแบบน่ารัก)
+    btn.style.transition = 'all 0.4s';
+    btn.style.left = 'auto';
+    btn.style.right = '30px';
+    btn.style.top = 'auto';
+    btn.style.bottom = '120px';
+    setTimeout(() => btn.style.transition = 'all 0.3s', 400);
+  });
+
+  // คลิกเปิด Panel
+  btn.addEventListener('click', togglePanel);
+});
+
+// ====================== Panel ภายใน (ดัดแปลงจากภาพทั้ง 5 ภาพ) ======================
+function togglePanel() {
+  let panel = document.getElementById('cute-html-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'cute-html-panel';
     panel.innerHTML = `
-        <div id="cute-html-header">📅 Cute HTML Renderer!!</div>
-        <div id="cute-html-body">
-            <label>
-                <input type="checkbox" id="enable-html" checked> เปิดใช้งาน (ลด Token อัตโนมัติ)
-            </label>
-            <br><br>
-            <button id="clear-html" style="width:100%; padding:8px; background:#d48c3d; color:white; border:none; border-radius:12px;">ล้างข้อมูลทั้งหมด</button>
-            <p style="font-size:12px; margin-top:10px; text-align:center; color:#8b5a2b;">
-                ลากหัวข้อเพื่อขยับ<br>มีฐานหยุดที่ขอบจอขวา \~<br>ธีมส้มน่ารักตามภาพที่คุณส่งมา!
-            </p>
-        </div>
+      <div style="text-align:center; margin-bottom:15px;">
+        <h2 style="color:#4a9cd6; font-size:24px;">Our Cute Widgets ✨</h2>
+        <p style="color:#666; font-size:14px;">HTML ถูกดึงออกแล้ว → Token เยอะขึ้น!</p>
+      </div>
+      <div class="widget-list" id="widget-list">
+        <!-- รายการจะโผล่ตรงนี้ -->
+      </div>
+      <div style="text-align:center; margin-top:15px; font-size:12px; color:#81c3f7;">
+        ปุ่มลอยขยับได้ • สีขาวฟ้า • น่ารักเหมือน Love & Deepspace
+      </div>
     `;
     document.body.appendChild(panel);
-
-    // ทำให้ลากได้
-    const header = panel.querySelector("#cute-html-header");
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    header.onmousedown = dragMouseDown;
-
-    function dragMouseDown(e) {
-        e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
+  }
+  
+  const list = document.getElementById('widget-list');
+  list.innerHTML = '';
+  
+  // แสดง widgets ที่มีในแชทปัจจุบัน (น่ารักแบบ image 1+5)
+  context.chat.forEach(msg => {
+    if (msg.extractedHtml && msg.extractedHtml.length > 0) {
+      const div = document.createElement('div');
+      div.style.cssText = 'background:#fff; padding:10px; margin:8px 0; border-radius:12px; border:2px solid #81c3f7;';
+      div.innerHTML = `
+        <strong>Widget ${msg.extractedHtml.length} ชิ้น</strong><br>
+        <small style="color:#666;">ถูกแทนที่ด้วย <code>1</code> <code>2</code> ... แล้ว</small>
+      `;
+      list.appendChild(div);
     }
-
-    function elementDrag(e) {
-        e.preventDefault();
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        panel.style.top = (panel.offsetTop - pos2) + "px";
-        panel.style.right = "auto";
-        panel.style.left = (panel.offsetLeft - pos1) + "px";
-    }
-
-    function closeDragElement() {
-        document.onmouseup = null;
-        document.onmousemove = null;
-        // สแนปกลับไปขวาถ้าอยู่ใกล้ขอบ
-        if (parseInt(panel.style.left) > window.innerWidth - 400) {
-            panel.style.left = "auto";
-            panel.style.right = "25px";
-        }
-    }
-
-    // ปุ่มเปิด/ปิด
-    panel.querySelector("#enable-html").onchange = (e) => {
-        htmlStorageEnabled = e.target.checked;
-    };
-
-    // ล้างข้อมูล
-    panel.querySelector("#clear-html").onclick = () => {
-        const ctx = getContext();
-        ctx.chat.forEach(msg => { if (msg.stHtmlBlocks) msg.stHtmlBlocks = []; });
-        saveSettingsDebounced();
-        toastr.success("ล้างข้อมูล HTML ทั้งหมดแล้ว!", "Cute HTML Renderer");
-    };
+  });
+  
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
 }
-
-// ตรวจจับและแทนที่โค้ด HTML → <code data-html-id="...">description</code>
-function handleMessageReceived(data) {
-    if (!htmlStorageEnabled || !data.message.mes) return;
-
-    const regex = /```html\s*([\s\S]*?)\s*```/g;
-    let match;
-    let newMes = data.message.mes;
-    const newBlocks = [];
-
-    while ((match = regex.exec(data.message.mes)) !== null) {
-        const fullBlock = match[0];
-        const content = match[1].trim();
-        const lines = content.split("\n");
-        let desc = "Rich UI Content";
-        let htmlContent = content;
-
-        if (lines.length > 1) {
-            const first = lines[0].trim();
-            if (first.toLowerCase().startsWith("description:") || first.toLowerCase().startsWith("desc:")) {
-                desc = first.replace(/^desc(ription)?:/i, "").trim();
-                htmlContent = lines.slice(1).join("\n");
-            } else {
-                desc = first;
-                htmlContent = lines.slice(1).join("\n") || content;
-            }
-        }
-
-        const id = `html-\( {Date.now()}- \){Math.floor(Math.random() * 10000)}`;
-        newBlocks.push({ id, html: htmlContent });
-
-        newMes = newMes.replace(fullBlock, `<code data-html-id="\( {id}"> \){desc}</code>`);
-    }
-
-    if (newBlocks.length > 0) {
-        data.message.mes = newMes;
-        data.message.stHtmlBlocks = (data.message.stHtmlBlocks || []).concat(newBlocks);
-    }
-}
-
-// แสดงผล HTML จริงในข้อความ
-function renderHtmlBlocks() {
-    const ctx = getContext();
-    const mesElements = document.querySelectorAll("#chat .mes");
-
-    mesElements.forEach((el, idx) => {
-        const msg = ctx.chat[idx];
-        if (!msg?.stHtmlBlocks) return;
-
-        const codeTags = el.querySelectorAll("code[data-html-id]");
-        codeTags.forEach(code => {
-            const id = code.dataset.htmlId;
-            const block = msg.stHtmlBlocks.find(b => b.id === id);
-            if (!block) return;
-
-            const container = document.createElement("div");
-            container.className = "st-html-rendered";
-            container.innerHTML = window.DOMPurify ? window.DOMPurify.sanitize(block.html) : block.html;
-
-            code.replaceWith(container);
-        });
-    });
-}
-
-jQuery(async () => {
-    console.log(`[${MODULE_NAME}] Loaded – น่ารักมากกก`);
-
-    createFloatingPanel();
-
-    // ฟังก์ชันหลัก
-    eventSource.on(event_types.MESSAGE_RECEIVED, handleMessageReceived);
-    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, renderHtmlBlocks);
-    eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(renderHtmlBlocks, 300));
-
-    // รันครั้งแรก
-    setTimeout(renderHtmlBlocks, 800);
-});
