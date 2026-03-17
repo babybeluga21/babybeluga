@@ -1,151 +1,149 @@
-(async function() {
-    const { getContext, extension_settings, saveSettingsDebounced } = await import('../../../extensions.js');
-    const { eventSource, event_types } = await import('../../../../script.js');
+import { extension_settings, getContext } from "../../../extensions.js";
+import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
-    const extensionName = "cold_system_tools";
-    if (!extension_settings[extensionName]) {
-        extension_settings[extensionName] = { enabled: true, enableHtmlOptimizer: true, placeholderText: "<code>[Content Optimized]</code>" };
-    }
+const MODULE_NAME = "cute-html-renderer";
+let htmlStorageEnabled = true;
 
-    // --- 1. CSS Injection (กระจกฝ้า ฟ้าใส + ทรงปุ่ม) ---
-    const styles = `
-        <style id="cold-tools-css">
-            #cold-ext-btn {
-                width: 32px !important; height: 32px !important; 
-                border-radius: 50% !important;
-                background-size: cover !important; 
-                background-position: center !important;
-                background-repeat: no-repeat !important;
-                border: 1.5px solid rgba(255, 255, 255, 0.6) !important;
-                cursor: pointer; flex-shrink: 0; margin: 0 5px;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                display: inline-block; vertical-align: middle;
-                transition: transform 0.2s;
-            }
-            #cold-ext-modal {
-                display: none; position: fixed; top: 50%; left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(135, 206, 235, 0.15) !important; /* ฟ้าใสจางๆ */
-                backdrop-filter: blur(12px) !important; -webkit-backdrop-filter: blur(12px) !important;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 18px; padding: 22px; width: 88%; max-width: 320px;
-                z-index: 999999; color: white; box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            }
-            #cold-ext-modal h4 { margin: 0 0 15px 0; text-align: center; letter-spacing: 1px; color: #e0f4ff; }
-            #cold-idx-input { 
-                width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); 
-                background: rgba(0,0,0,0.2); color: white; margin-bottom: 12px; box-sizing: border-box; 
-            }
-            .cold-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-            .cold-btn { border: none; padding: 12px; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
-            .btn-p { background: rgba(0, 150, 255, 0.35); }
-            .btn-s { background: rgba(255, 255, 255, 0.15); }
-            .btn-d { background: rgba(255, 60, 60, 0.35); grid-column: span 2; margin-top: 5px; }
-        </style>
+// สร้างแผงลอยน่ารักฝั่งขวา (ขยับได้ + มีฐาน)
+function createFloatingPanel() {
+    const panel = document.createElement("div");
+    panel.id = "cute-html-panel";
+    panel.innerHTML = `
+        <div id="cute-html-header">📅 Cute HTML Renderer!!</div>
+        <div id="cute-html-body">
+            <label>
+                <input type="checkbox" id="enable-html" checked> เปิดใช้งาน (ลด Token อัตโนมัติ)
+            </label>
+            <br><br>
+            <button id="clear-html" style="width:100%; padding:8px; background:#d48c3d; color:white; border:none; border-radius:12px;">ล้างข้อมูลทั้งหมด</button>
+            <p style="font-size:12px; margin-top:10px; text-align:center; color:#8b5a2b;">
+                ลากหัวข้อเพื่อขยับ<br>มีฐานหยุดที่ขอบจอขวา \~<br>ธีมส้มน่ารักตามภาพที่คุณส่งมา!
+            </p>
+        </div>
     `;
-    if (!$('#cold-tools-css').length) $('head').append(styles);
+    document.body.appendChild(panel);
 
-    // --- 2. ฟังก์ชันดึงรูปโปรไฟล์ Persona ({{user}}) ---
-    function getPersonaPhoto() {
-        // อ้างอิงจากระบบ ST และ CSS ที่คุณส่งมา
-        const personaImg = $('#user_avatar').attr('src') || // รูปในหน้า UI หลัก
-                         $('#avatar_user').attr('src') || // รูปในตั้งค่า
-                         $('.user-avatar img').first().attr('src'); // รูปจากแชท
-        
-        return personaImg || '/img/User Avatar.png';
+    // ทำให้ลากได้
+    const header = panel.querySelector("#cute-html-header");
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    header.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
     }
 
-    // --- 3. ฟังก์ชันสร้างและย้ายตำแหน่งปุ่ม ---
-    function forceButtonPosition() {
-        const target = $('#options_button'); // ปุ่มไม้กายสิทธิ์
-        let btn = $('#cold-ext-btn');
+    function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        panel.style.top = (panel.offsetTop - pos2) + "px";
+        panel.style.right = "auto";
+        panel.style.left = (panel.offsetLeft - pos1) + "px";
+    }
 
-        if (target.length === 0) return; // ถ้ายังไม่โหลดปุ่ม ST ให้รอ
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        // สแนปกลับไปขวาถ้าอยู่ใกล้ขอบ
+        if (parseInt(panel.style.left) > window.innerWidth - 400) {
+            panel.style.left = "auto";
+            panel.style.right = "25px";
+        }
+    }
 
-        if (btn.length === 0) {
-            // สร้างปุ่มใหม่ถ้ายังไม่มี
-            btn = $('<div id="cold-ext-btn"></div>');
-            btn.on('click', () => {
-                btn.css('background-image', `url("${getPersonaPhoto()}")`);
-                $('#cold-ext-modal').fadeIn(200);
-            });
-            
-            // สร้าง Modal
-            if (!$('#cold-ext-modal').length) {
-                $('body').append(`
-                    <div id="cold-ext-modal">
-                        <h4>SYSTEM SEARCH</h4>
-                        <input type="number" id="cold-idx-input" placeholder="ใส่เลข Index...">
-                        <div id="cold-preview" style="font-size:12px; height:40px; overflow:hidden; opacity:0.8; margin-bottom:10px;"></div>
-                        <div class="cold-grid">
-                            <button class="cold-btn btn-s" id="c-copy">คัดลอก</button>
-                            <button class="cold-btn btn-s" id="c-token">เช็ค</button>
-                            <button class="cold-btn btn-p" id="c-branch">แยกรูท</button>
-                            <button class="cold-btn btn-d" id="c-close">ปิดหน้าต่าง</button>
-                        </div>
-                    </div>
-                `);
-                
-                // Modal Events
-                $('#c-close').on('click', () => $('#cold-ext-modal').fadeOut(200));
-                $('#cold-idx-input').on('input', function() {
-                    const idx = $(this).val();
-                    const chat = getContext().chat;
-                    if (chat[idx]) $('#cold-preview').text(chat[idx].mes.substring(0, 60) + "...");
-                });
-                $('#c-copy').on('click', () => {
-                    const idx = $('#cold-idx-input').val();
-                    const chat = getContext().chat;
-                    if (chat[idx]) { navigator.clipboard.writeText(chat[idx].mes); toastr.success('คัดลอกแล้ว'); }
-                });
-                $('#c-branch').on('click', async () => {
-                    const idx = parseInt($('#cold-idx-input').val());
-                    if (confirm('คุณแน่ใจนะว่าจะตัดแชทจากตรงนี้?')) {
-                        getContext().chat.splice(idx + 1);
-                        await getContext().saveChat();
-                        window.location.reload();
-                    }
-                });
+    // ปุ่มเปิด/ปิด
+    panel.querySelector("#enable-html").onchange = (e) => {
+        htmlStorageEnabled = e.target.checked;
+    };
+
+    // ล้างข้อมูล
+    panel.querySelector("#clear-html").onclick = () => {
+        const ctx = getContext();
+        ctx.chat.forEach(msg => { if (msg.stHtmlBlocks) msg.stHtmlBlocks = []; });
+        saveSettingsDebounced();
+        toastr.success("ล้างข้อมูล HTML ทั้งหมดแล้ว!", "Cute HTML Renderer");
+    };
+}
+
+// ตรวจจับและแทนที่โค้ด HTML → <code data-html-id="...">description</code>
+function handleMessageReceived(data) {
+    if (!htmlStorageEnabled || !data.message.mes) return;
+
+    const regex = /```html\s*([\s\S]*?)\s*```/g;
+    let match;
+    let newMes = data.message.mes;
+    const newBlocks = [];
+
+    while ((match = regex.exec(data.message.mes)) !== null) {
+        const fullBlock = match[0];
+        const content = match[1].trim();
+        const lines = content.split("\n");
+        let desc = "Rich UI Content";
+        let htmlContent = content;
+
+        if (lines.length > 1) {
+            const first = lines[0].trim();
+            if (first.toLowerCase().startsWith("description:") || first.toLowerCase().startsWith("desc:")) {
+                desc = first.replace(/^desc(ription)?:/i, "").trim();
+                htmlContent = lines.slice(1).join("\n");
+            } else {
+                desc = first;
+                htmlContent = lines.slice(1).join("\n") || content;
             }
         }
 
-        // อัปเดตรูป Persona ล่าสุด
-        btn.css('background-image', `url("${getPersonaPhoto()}")`);
+        const id = `html-\( {Date.now()}- \){Math.floor(Math.random() * 10000)}`;
+        newBlocks.push({ id, html: htmlContent });
 
-        // บังคับย้ายตำแหน่งไปหลังปุ่มไม้กายสิทธิ์ (ตำแหน่งที่ 3)
-        if (!btn.prev().is('#options_button')) {
-            target.after(btn);
-        }
+        newMes = newMes.replace(fullBlock, `<code data-html-id="\( {id}"> \){desc}</code>`);
     }
 
-    // --- 4. ระบบ MutationObserver ตรวจจับการเปลี่ยนแปลงหน้าจอ (สำหรับมือถือ) ---
-    const observer = new MutationObserver(() => {
-        forceButtonPosition();
+    if (newBlocks.length > 0) {
+        data.message.mes = newMes;
+        data.message.stHtmlBlocks = (data.message.stHtmlBlocks || []).concat(newBlocks);
+    }
+}
+
+// แสดงผล HTML จริงในข้อความ
+function renderHtmlBlocks() {
+    const ctx = getContext();
+    const mesElements = document.querySelectorAll("#chat .mes");
+
+    mesElements.forEach((el, idx) => {
+        const msg = ctx.chat[idx];
+        if (!msg?.stHtmlBlocks) return;
+
+        const codeTags = el.querySelectorAll("code[data-html-id]");
+        codeTags.forEach(code => {
+            const id = code.dataset.htmlId;
+            const block = msg.stHtmlBlocks.find(b => b.id === id);
+            if (!block) return;
+
+            const container = document.createElement("div");
+            container.className = "st-html-rendered";
+            container.innerHTML = window.DOMPurify ? window.DOMPurify.sanitize(block.html) : block.html;
+
+            code.replaceWith(container);
+        });
     });
+}
 
-    // เริ่มทำงาน
-    jQuery(async () => {
-        forceButtonPosition();
-        
-        // สั่งให้คอยดูการเปลี่ยนแปลงของแถบเครื่องมือด้านล่าง
-        const footer = document.querySelector('#send_form') || document.body;
-        observer.observe(footer, { childList: true, subtree: true });
+jQuery(async () => {
+    console.log(`[${MODULE_NAME}] Loaded – น่ารักมากกก`);
 
-        // Backup plan: เช็คซ้ำทุก 2 วินาที เผื่อ Observer พลาด
-        setInterval(forceButtonPosition, 2000);
-        
-        console.log("Cold System Tools: Persona Button Mode Active");
-    });
+    createFloatingPanel();
 
-    // Token Optimizer Logic
-    eventSource.on(event_types.MAKE_PROMPT, (args) => {
-        if (extension_settings[extensionName].enableHtmlOptimizer && args.chat) {
-            args.chat.forEach(msg => {
-                if (msg.mes?.includes('<code>')) {
-                    msg.mes = msg.mes.replace(/<code>[\s\S]*?<\/code>/g, extension_settings[extensionName].placeholderText);
-                }
-            });
-        }
-    });
+    // ฟังก์ชันหลัก
+    eventSource.on(event_types.MESSAGE_RECEIVED, handleMessageReceived);
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, renderHtmlBlocks);
+    eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(renderHtmlBlocks, 300));
 
-})();
+    // รันครั้งแรก
+    setTimeout(renderHtmlBlocks, 800);
+});
