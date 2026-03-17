@@ -1,59 +1,67 @@
+/* สีหลัก: ขาว-ฟ้าอ่อนนุ่ม */
+:root {
+  --bg: #f8fcff;
+  --accent: #81c3f7;
+  --accent-dark: #4a9cd6;
+  --shadow: 0 8px 20px rgba(129, 195, 247, 0.3);
+}
+
+#cute-html-button {
+  position: fixed;
+  right: 30px;
+  bottom: 120px;
+  width: 58px;
+  height: 58px;
+  background: var(--bg);
+  border: 4px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  cursor: grab;
+  z-index: 99999;
+  transition: all 0.3s;
+  user-select: none;
+}
+
+#cute-html-button:hover {
+  transform: scale(1.15);
+  box-shadow: 0 12px 30px rgba(129, 195, 247, 0.5);
+}
+
 #cute-html-panel {
-    position: fixed;
-    right: 25px;
-    top: 120px;
-    width: 320px;
-    background: #f8e4c9;
-    border: 6px solid #d48c3d;
-    border-radius: 25px;
-    box-shadow: 0 15px 30px rgba(212, 140, 61, 0.3);
-    z-index: 99999;
-    font-family: "Segoe UI", sans-serif;
-    overflow: hidden;
-    transition: all 0.3s ease;
+  position: fixed;
+  right: 30px;
+  bottom: 200px;
+  width: 380px;
+  background: var(--bg);
+  border: 6px solid var(--accent);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: none;
+  z-index: 99998;
+  font-family: "Comic Sans MS", cursive;
+  color: #333;
 }
 
-#cute-html-header {
-    background: linear-gradient(#ffcc80, #d48c3d);
-    color: white;
-    padding: 12px 15px;
-    font-weight: bold;
-    font-size: 18px;
-    text-align: center;
-    cursor: move;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 4px solid #b36b2e;
+/* ปรับให้เหมือนภาพ notebook + schedule */
+#cute-html-panel::before {
+  content: "📖 Our Cute Widgets 📖";
+  display: block;
+  text-align: center;
+  font-size: 22px;
+  color: var(--accent-dark);
+  margin-bottom: 15px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-#cute-html-header::before {
-    content: "📅";
-    font-size: 24px;
-}
-
-#cute-html-body {
-    padding: 15px;
-    color: #5c4033;
-}
-
-.st-html-rendered {
-    border: 5px solid #d48c3d;
-    background: #fffaf0;
-    padding: 15px;
-    border-radius: 18px;
-    box-shadow: 0 8px 15px rgba(0,0,0,0.15);
-    margin: 12px 0;
-    position: relative;
-    overflow: hidden;
-}
-
-.st-html-rendered::before {
-    content: "☆";
-    position: absolute;
-    top: -10px;
-    right: -10px;
-    font-size: 40px;
-    color: #ffcc80;
-    opacity: 0.3;
+.widget-list {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px;
 }
