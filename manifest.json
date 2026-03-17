@@ -1,9 +1,11 @@
 {
-  "display_name": "Cute HTML Widget Extractor",
-  "loading_order": 10,
+  "display_name": "HTML Code Manager",
+  "version": "1.0.0",
+  "description": "Extracts HTML code blocks from AI responses, stores them, and replaces them with lightweight <codeN> markers to save token context.",
+  "author": "custom",
   "js": "index.js",
   "css": "style.css",
-  "author": "Urjdjd (ปรับให้ตามภาพ)",
-  "version": "1.0",
-  "description": "ดึง HTML ออกเพื่อประหยัด Token + แสดงผลน่ารักสีขาวฟ้า + ปุ่มลอยขยับได้"
+  "tags": ["utility", "token-saving", "html"],
+  "homepage": ""
 }
+ 
