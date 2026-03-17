@@ -1,9 +1,9 @@
 {
-  "display_name": "Cute HTML Renderer (Token Saver)",
+  "display_name": "Cute HTML Widget Extractor",
+  "loading_order": 10,
   "js": "index.js",
   "css": "style.css",
-  "author": "Grok + Urjdjd",
+  "author": "Urjdjd (ปรับให้ตามภาพ)",
   "version": "1.0",
-  "loading_order": 10,
-  "homePage": "https://ko-fi.com/radeish"
+  "description": "ดึง HTML ออกเพื่อประหยัด Token + แสดงผลน่ารักสีขาวฟ้า + ปุ่มลอยขยับได้"
 }
