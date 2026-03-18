@@ -1,11 +1,12 @@
 {
-  "display_name": "HTML Code Manager",
-  "version": "1.0.0",
-  "description": "Extracts HTML code blocks from AI responses, stores them, and replaces them with lightweight <codeN> markers to save token context.",
-  "author": "custom",
+  "display_name": "HCM Diary",
+  "version": "2.1.0",
+  "author": "HCM",
+  "description": "ตัวจัดการโค้ด HTML + ปฏิทินตัวละคร แยกข้อมูลต่อแชท บันทึกถาวรใน ST",
+  "requires": [],
+  "optional": [],
   "js": "index.js",
   "css": "style.css",
-  "tags": ["utility", "token-saving", "html"],
-  "homepage": ""
+  "homepage": "",
+  "tags": ["utility", "calendar", "code-manager"]
 }
- 
