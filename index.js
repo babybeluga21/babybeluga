@@ -1,38 +1,17 @@
 /**
  * HCM Diary Extension v2.1
- * ─────────────────────────────────────────────────────────────
- * ระบบที่ 01 — Code Manager
- *   • ตรวจจับ ```html...``` จาก AI response
- *   • แทนที่ด้วย <codeN></codeN> ใน context (~450 tok → ~12 tok)
- *   • เก็บ HTML จริงไว้ใน store, แสดง card ใน panel
- *
- * ระบบที่ 02 — Calendar
- *   • AI ใส่ [CAL:person=,date=,time=,activity=,symbol=,details=]
- *   • Extension จับ → ลบออกจากข้อความ → บันทึกปฏิทิน
- *   • Inject ปฏิทินเข้า context ก่อนโรลทุกครั้ง (system prompt position)
- *   • แยกข้อมูลต่อ chatId, บันทึกถาวรใน extension_settings
- * ─────────────────────────────────────────────────────────────
+ * ใช้ global variables ของ ST — ไม่มี import statement
  */
 
-// ── ตรวจสอบว่าไฟล์โหลดขึ้นมาได้ ──
 console.log('[HCM] index.js parsing...');
 
-import {
-    getContext,
-    saveSettingsDebounced,
-    eventSource,
-    event_types,
-} from '../../../../script.js';
-
-import {
-    extension_settings,
-    setExtensionPrompt,
-} from '../../../../extensions.js';
-
-// Safe wrapper — ถ้า setExtensionPrompt ไม่มีใน ST เวอร์ชันนี้ก็ไม่ crash
-const _setPrompt = (typeof setExtensionPrompt === 'function')
-    ? setExtensionPrompt
-    : () => {};  // no-op fallback
+// ── ST globals (ไม่ใช้ import) ──────────────────────────────────
+const getContext          = () => window.SillyTavern?.getContext?.() ?? {};
+const saveSettingsDebounced = window.saveSettingsDebounced ?? (() => {});
+const eventSource         = window.eventSource;
+const event_types         = window.event_types ?? {};
+const extension_settings  = window.extension_settings ?? {};
+const _setPrompt          = window.setExtensionPrompt ?? (() => {});
 
 // ═══ CONSTANTS ════════════════════════════════════════════════
 const EXT      = 'hcm_diary';
@@ -63,12 +42,14 @@ const DEFAULTS = {
 };
 
 function S() {
-    if (!extension_settings[EXT]) extension_settings[EXT] = {};
+    const store = window.extension_settings;
+    if (!store) return DEFAULTS;  // ถ้า ST ยังไม่พร้อม
+    if (!store[EXT]) store[EXT] = {};
     for (const k in DEFAULTS) {
-        if (extension_settings[EXT][k] === undefined)
-            extension_settings[EXT][k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
+        if (store[EXT][k] === undefined)
+            store[EXT][k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
     }
-    return extension_settings[EXT];
+    return store[EXT];
 }
 
 function getChatId() {
@@ -507,7 +488,7 @@ function bindEvents() {
     // TOC row click
     document.querySelectorAll('.hcm-trow.hcm-can').forEach(row => {
         row.addEventListener('click', () => openSection(row.dataset.nav));
-    });
+            });
 
     // Code sub-tabs
     document.querySelectorAll('#hcm-tabs-code .hcm-stab').forEach(t =>
@@ -944,19 +925,22 @@ function refreshAllUI() {
 
 // ═══ ST EVENT HOOKS ═══════════════════════════════════════════
 function registerHooks() {
-    // รับข้อความใหม่จาก AI
-    eventSource.on(event_types.MESSAGE_RECEIVED, (msgId) => {
+    const es = window.eventSource;
+    const et = window.event_types;
+    if (!es || !et) {
+        console.warn('[HCM] eventSource/event_types not available — hooks skipped');
+        return;
+    }
+
+    es.on(et.MESSAGE_RECEIVED, (msgId) => {
         processMessage(msgId);
     });
 
-    // render ซ้ำเมื่อโหลดแชท (เช่น scroll up)
-    eventSource.on(event_types.MESSAGE_RENDERED, (msgId) => {
-        // re-render code markers ใน DOM เท่านั้น ไม่ process ซ้ำ
+    es.on(et.MESSAGE_RENDERED, (msgId) => {
         renderCodeMarkers(msgId);
     });
 
-    // เปลี่ยนแชท
-    eventSource.on(event_types.CHAT_CHANGED, () => {
+    es.on(et.CHAT_CHANGED, () => {
         globalCounter = 0;
         updateInjection();
         refreshAllUI();
@@ -1023,4 +1007,3 @@ if (document.readyState === 'loading') {
         hcmInit();
     }
 }
- 
