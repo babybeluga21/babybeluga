@@ -288,7 +288,7 @@
 }
 .hcm-trow.hcm-locked { opacity: .32; cursor: default; }
 .hcm-tl {
-  width: 43px; flex-shrink: 0; border-right: 1px solid var(--bdr);
+     width: 43px; flex-shrink: 0; border-right: 1px solid var(--bdr);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 4px; position: relative;
 }
@@ -439,7 +439,8 @@
 #hcm-panel select option { background: #140f2c; color: var(--ink); }
 
 /* ─── Calendar ───────────────────────────────────────────────── */
-.hcm-cal-nav {splay: flex; align-items: center; justify-content: space-between;
+.hcm-cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
   padding: 7px 15px 6px 11px; border-bottom: 1px solid var(--bdr);
   background: rgba(255,255,255,.022);
 }
