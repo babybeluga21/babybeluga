@@ -1,573 +1,528 @@
-// ═══════════════════════════════════════════════════════════════
-//  HTML Code Manager — SillyTavern Extension
-//  index.js
-//
-//  ระบบ:
-//  1. ดักจับโค้ด HTML จาก AI response
-//  2. เก็บโค้ดไว้ใน codeStore{}
-//  3. แทนที่โค้ดด้วย <codeN></codeN> ใน context ที่โมเดลเห็น
-//  4. แสดง marker แบบคลิกได้ในหน้า chat สำหรับ user
-// ═══════════════════════════════════════════════════════════════
+
+/**
+ * HCM Diary Extension v2.1
+ * ─────────────────────────────────────────────────────────────
+ * ระบบที่ 01 — Code Manager
+ *   • ตรวจจับ ```html...``` จาก AI response
+ *   • แทนที่ด้วย <codeN></codeN> ใน context (~450 tok → ~12 tok)
+ *   • เก็บ HTML จริงไว้ใน store, แสดง card ใน panel
+ *
+ * ระบบที่ 02 — Calendar
+ *   • AI ใส่ [CAL:person=,date=,time=,activity=,symbol=,details=]
+ *   • Extension จับ → ลบออกจากข้อความ → บันทึกปฏิทิน
+ *   • Inject ปฏิทินเข้า context ก่อนโรลทุกครั้ง (system prompt position)
+ *   • แยกข้อมูลต่อ chatId, บันทึกถาวรใน extension_settings
+ * ─────────────────────────────────────────────────────────────
+ */
 
 import {
-  eventSource,
-  event_types,
-  saveSettingsDebounced,
+    getContext,
+    saveSettingsDebounced,
+    eventSource,
+    event_types,
 } from '../../../../script.js';
 
-import { extension_settings } from '../../../extensions.js';
+import {
+    extension_settings,
+    setExtensionPrompt,
+} from '../../../../extensions.js';
 
-// ── EXTENSION NAME ──
-const EXT_NAME = 'html-code-manager';
+// ═══ CONSTANTS ════════════════════════════════════════════════
+const EXT      = 'hcm_diary';
+const INJ_KEY  = 'hcm_calendar';
+const INJ_POS  = 1;   // position: after system prompt, before chat
+const INJ_DEPTH = 0;
 
-// ── DEFAULT SETTINGS ──
-const DEFAULT_SETTINGS = {
-  enabled:        true,   // เปิด/ปิด extension ทั้งหมด
-  replaceInCtx:   true,   // แทนที่โค้ดด้วย <codeN> ใน context
-  showPreview:    true,   // แสดง rendered preview ใน popup
-  numberedMarkers: true,  // ใช้ <code1>, <code2> (false = ใช้ <code> เดียว)
+const CAL_RE  = /\[CAL:([^\]]+)\]/gi;
+const HTML_RE = /```html\s*([\s\S]*?)```/gi;
+
+const SYMBOL_MAP = {
+    heart   : { c: '\u2665', label: 'นัดพบ',        color: '#e87098' },
+    star    : { c: '\u2605', label: 'สำคัญ',         color: '#e8c870' },
+    diamond : { c: '\u25C6', label: 'ประชุม',        color: '#9898e8' },
+    note    : { c: '\u266A', label: 'บันเทิง',       color: '#70c898' },
+    cross   : { c: '\u271D', label: 'ขัดแย้ง',       color: '#e87070' },
+    task    : { c: '\u2295', label: 'งาน/ภารกิจ',   color: '#88a8d8' },
+    general : { c: '\u25C7', label: 'ทั่วไป',        color: '#a898c8' },
 };
 
-// ── CODE STORE ──
-// codeStore[messageId] = [ { id, html, tokens, ts }, ... ]
-let codeStore = {};
-let globalCodeCounter = 0; // id สะสมข้ามทุก message
+// ═══ SETTINGS ═════════════════════════════════════════════════
+const DEFAULTS = {
+    enabled         : true,
+    calendarEnabled : true,
+    codeEnabled     : true,
+    calendarData    : {},  // { [chatId]: { events: [] } }
+    codeData        : {},  // { [chatId]: { blocks: [] } }
+};
 
-// ── SETTINGS ──
-function getSettings() {
-  if (!extension_settings[EXT_NAME]) {
-    extension_settings[EXT_NAME] = { ...DEFAULT_SETTINGS };
-  }
-  return extension_settings[EXT_NAME];
+function S() {
+    if (!extension_settings[EXT]) extension_settings[EXT] = {};
+    for (const k in DEFAULTS) {
+        if (extension_settings[EXT][k] === undefined)
+            extension_settings[EXT][k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
+    }
+    return extension_settings[EXT];
 }
 
-// ══════════════════════════════════════════════════
-//  CORE: EXTRACT HTML FROM TEXT
-//  รองรับ 3 รูปแบบ:
-//  1. ```html ... ```
-//  2. ``` ... ``` (ถ้าข้างในเป็น HTML tag)
-//  3. <html>...</html> block ทั้งหมด
-// ══════════════════════════════════════════════════
-const HTML_PATTERNS = [
-  /```html\s*([\s\S]*?)```/gi,
-  /```\s*(<(?:div|span|section|article|button|form|table|ul|ol|nav|header|footer|main|aside|figure|p|h[1-6]|a|img)[\s\S]*?>[\s\S]*?)\s*```/gi,
-  /(<html[\s\S]*?<\/html>)/gi,
-];
-
-/**
- * ดึง HTML blocks ออกจากข้อความ
- * @param {string} text - ข้อความจาก AI
- * @returns {{ blocks: string[], cleaned: string }}
- *   blocks  = array ของ HTML string ที่ดึงออกมา
- *   cleaned = ข้อความที่ลบ HTML ออกแล้ว (ยังไม่ใส่ marker)
- */
-function extractHtmlBlocks(text) {
-  const blocks = [];
-  let cleaned = text;
-
-  for (const pattern of HTML_PATTERNS) {
-    pattern.lastIndex = 0; // reset regex state
-    cleaned = cleaned.replace(pattern, (fullMatch, capture) => {
-      const html = (capture || fullMatch).trim();
-      if (html && !blocks.includes(html)) {
-        blocks.push(html);
-      }
-      return '\x00PLACEHOLDER\x00'; // ชั่วคราว ก่อนใส่ marker
-    });
-  }
-
-  return { blocks, cleaned };
+function getChatId() {
+    try { return getContext().chatId || 'default'; } catch { return 'default'; }
 }
 
-// ══════════════════════════════════════════════════
-//  CORE: STORE & BUILD MARKER
-// ══════════════════════════════════════════════════
-/**
- * เก็บ HTML block และคืน marker string
- * @param {string} html
- * @param {string} messageId
- * @returns {{ markerId: number, markerTag: string }}
- */
-function storeBlock(html, messageId) {
-  const s = getSettings();
-  globalCodeCounter++;
-  const markerId = globalCodeCounter;
-
-  const entry = {
-    id:      markerId,
-    html:    html,
-    tokens:  estimateTokens(html),
-    ts:      new Date().toLocaleTimeString('th-TH'),
-    msgId:   messageId,
-  };
-
-  if (!codeStore[messageId]) codeStore[messageId] = [];
-  codeStore[messageId].push(entry);
-
-  const tag = s.numberedMarkers ? `code${markerId}` : 'code';
-  // markerTag = สิ่งที่โมเดลจะเห็นใน context แทนโค้ดจริง
-  const markerTag = `<${tag}></${tag}>`;
-
-  return { markerId, markerTag };
+// ═══ CALENDAR DATA ════════════════════════════════════════════
+function calData() {
+    const s = S(), id = getChatId();
+    if (!s.calendarData[id]) s.calendarData[id] = { events: [] };
+    return s.calendarData[id];
 }
 
-/** ประมาณ token count (1 token ≈ 4 ตัวอักษร) */
-function estimateTokens(text) {
-  return Math.ceil(text.length / 4);
+function addEvent(evt) {
+    const events = calData().events;
+    // ป้องกัน duplicate จาก re-render
+    const dup = events.find(e =>
+        e.date === evt.date && e.time === evt.time &&
+        e.person === evt.person && e.activity === evt.activity
+    );
+    if (dup) return;
+    events.push({ id: Date.now() + Math.random(), ...evt });
+    saveSettingsDebounced();
+    updateInjection();
+    refreshCalUI();
 }
 
-// ══════════════════════════════════════════════════
-//  CORE: PROCESS MESSAGE
-//  - รับ text จาก AI
-//  - ดึง HTML ออก, เก็บ, ใส่ marker
-//  - คืน contextText (ที่โมเดลจะเห็น) กับ displayText (user เห็น)
-// ══════════════════════════════════════════════════
-function processMessage(text, messageId) {
-  const s = getSettings();
-  if (!s.enabled) return { contextText: text, displayText: text, count: 0 };
+function removeEvent(id) {
+    const d = calData();
+    d.events = d.events.filter(e => e.id !== id);
+    saveSettingsDebounced();
+    updateInjection();
+    refreshCalUI();
+}
 
-  const { blocks, cleaned } = extractHtmlBlocks(text);
-  if (blocks.length === 0) return { contextText: text, displayText: text, count: 0 };
-
-  let contextText = cleaned; // สำหรับโมเดล (มี marker แทนโค้ด)
-  let displayText = cleaned; // สำหรับ user (มี clickable marker)
-
-  let placeholderIndex = 0;
-
-  for (const html of blocks) {
-    const { markerId, markerTag } = storeBlock(html, messageId);
-
-    if (s.replaceInCtx) {
-      // context: แทนด้วย <codeN></codeN>
-      contextText = contextText.replace('\x00PLACEHOLDER\x00', markerTag);
-    } else {
-      contextText = contextText.replace('\x00PLACEHOLDER\x00', '');
+// ─── Build injection text ──────────────────────────────────────
+function updateInjection() {
+    if (!S().calendarEnabled) {
+        setExtensionPrompt(INJ_KEY, '', INJ_POS, INJ_DEPTH);
+        return;
+    }
+    const events = calData().events;
+    if (!events.length) {
+        setExtensionPrompt(INJ_KEY, '', INJ_POS, INJ_DEPTH);
+        return;
     }
 
-    // display: แทนด้วย clickable marker สำหรับ user
-    const tag = s.numberedMarkers ? `code${markerId}` : 'code';
-    const displayMarker = `<span class="hcm-marker" data-hcm-id="${markerId}" title="คลิกเพื่อดูโค้ด">📄 ${tag}</span>`;
-    displayText = displayText.replace('\x00PLACEHOLDER\x00', displayMarker);
-  }
+    const now    = new Date();
+    const todayS = dateStr(now);
+    const timeS  = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const sorted = [...events].sort((a, b) =>
+        (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`)
+    );
+    const upcoming = sorted.filter(e => (e.date || '') >= todayS);
 
-  // ล้าง placeholder ที่เหลือ (ถ้ามี)
-  contextText = contextText.replace(/\x00PLACEHOLDER\x00/g, '');
-  displayText = displayText.replace(/\x00PLACEHOLDER\x00/g, '');
+    let text = `[ปฏิทินตัวละคร — ${todayS} เวลา ${timeS}]\n`;
+    if (!upcoming.length) {
+        text += '(ไม่มีกำหนดการที่จะถึง)';
+    } else {
+        upcoming.slice(0, 15).forEach(e => {
+            const when = e.date === todayS ? 'วันนี้' : e.date;
+            text += `• ${when} ${e.time || '--:--'} | ${e.person || 'ทุกคน'} | ${e.activity || ''}`;
+            if (e.details) text += ` — ${e.details}`;
+            text += '\n';
+        });
+    }
+    text += '[/ปฏิทินตัวละคร]';
 
-  return { contextText, displayText, count: blocks.length };
+    setExtensionPrompt(INJ_KEY, text, INJ_POS, INJ_DEPTH);
 }
 
-// ══════════════════════════════════════════════════
-//  SILLYTAVERN HOOKS
-// ══════════════════════════════════════════════════
+// ═══ CODE DATA ════════════════════════════════════════════════
+let globalCounter = 0;
 
-/**
- * EVENT: MESSAGE_RECEIVED
- * ทำงานหลังโมเดลตอบกลับมา ก่อนแสดงผลใน chat
- */
-eventSource.on(event_types.MESSAGE_RECEIVED, (/** @type {number} */ messageId) => {
-  const chat = window.chat; // SillyTavern global chat array
-  if (!chat || chat[messageId] === undefined) return;
+function codeData() {
+    const s = S(), id = getChatId();
+    if (!s.codeData[id]) s.codeData[id] = { blocks: [] };
+    return s.codeData[id];
+}
 
-  const msg = chat[messageId];
-  if (!msg || msg.is_user) return; // ประมวลเฉพาะ AI message
+function addBlock(html, msgId) {
+    globalCounter++;
+    const block = {
+        id     : globalCounter,
+        html,
+        msgId,
+        tokens : Math.ceil(html.length / 4),
+        ts     : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+    };
+    codeData().blocks.push(block);
+    saveSettingsDebounced();
+    refreshCodeUI();
+    return block;
+}
 
-  const originalText = msg.mes;
-  const { contextText, displayText, count } = processMessage(originalText, String(messageId));
+function removeBlock(id) {
+    codeData().blocks = codeData().blocks.filter(b => b.id !== id);
+    saveSettingsDebounced();
+    refreshCodeUI();
+}
 
-  if (count === 0) return;
+// ═══ MESSAGE PROCESSING ═══════════════════════════════════════
+function processMessage(messageId) {
+    const ctx = getContext();
+    if (!ctx.chat || !ctx.chat[messageId]) return;
+    const msg = ctx.chat[messageId];
+    if (msg.is_user) return;
 
-  // อัปเดต msg.mes = contextText (สิ่งที่ส่งกลับเป็น context ครั้งต่อไป)
-  msg.mes = contextText;
+    let text  = msg.mes;
+    let dirty = false;
 
-  // เก็บ displayText ไว้แยก เพื่อให้ renderer หน้า chat ใช้
-  msg.extra = msg.extra || {};
-  msg.extra.hcm_display = displayText;
+    // ─ Method A: [CAL:...] tags ─
+    if (S().calendarEnabled) {
+        const hits = [...text.matchAll(CAL_RE)];
+        hits.forEach(m => {
+            const a = parseAttrs(m[1]);
+            if (a.activity || a.date) {
+                addEvent({
+                    person   : a.person   || '',
+                    date     : a.date     || dateStr(new Date()),
+                    time     : a.time     || '',
+                    activity : a.activity || '',
+                    symbol   : a.symbol   || 'general',
+                    details  : a.details  || '',
+                });
+            }
+        });
+        if (hits.length) {
+            text  = text.replace(CAL_RE, '').replace(/\n{3,}/g, '\n\n').trim();
+            dirty = true;
+        }
+        CAL_RE.lastIndex = 0;
+    }
 
-  // บันทึก settings
-  saveSettingsDebounced();
+    // ─ Method B: regex scan for time keywords ─
+    if (S().calendarEnabled) {
+        scanPatterns(text, messageId);
+    }
 
-  // อัปเดต UI ของ extension
-  refreshPanel();
-});
+    // ─ Code block extraction ─
+    if (S().codeEnabled) {
+        const htmlHits = [...text.matchAll(HTML_RE)];
+        if (htmlHits.length) {
+            htmlHits.forEach(m => addBlock(m[1].trim(), messageId));
+            let idx = 0;
+            text = text.replace(HTML_RE, () => {
+                const blocks = codeData().blocks;
+                const b = blocks[blocks.length - htmlHits.length + idx];
+                idx++;
+                return b ? `<code${b.id}></code${b.id}>` : '';
+            }).trim();
+            dirty = true;
+            HTML_RE.lastIndex = 0;
+        }
+    }
 
-/**
- * EVENT: MESSAGE_RENDERED
- * หลัง DOM render แล้ว → แทน text ใน .mes_text ด้วย display version
- */
-eventSource.on(event_types.MESSAGE_RENDERED, (messageId) => {
-  const chat = window.chat;
-  if (!chat || !chat[messageId]) return;
+    if (dirty) {
+        msg.mes = text;
+        const el = document.querySelector(`[mesid="${messageId}"] .mes_text`);
+        if (el) el.innerHTML = msg.mes;
+        // update badge
+        updateBadge();
+    }
+}
 
-  const msg = chat[messageId];
-  if (!msg?.extra?.hcm_display) return;
+// Method B: scan for schedule keywords + time pattern
+const TIME_RE     = /(\d{1,2})[:.h]\d{2}(?:\s*(?:น\.|นาฬิกา|โมง))?/g;
+const SCHEDULE_KW = ['นัด', 'ไป', 'พบ', 'ประชุม', 'งาน', 'เจอ', 'meet', 'schedule', 'appointment'];
 
-  const mesDiv = document.querySelector(`[mesid="${messageId}"] .mes_text`);
-  if (!mesDiv) return;
-
-  // แทนที่ HTML ใน DOM (ใส่ marker ที่คลิกได้)
-  mesDiv.innerHTML = msg.extra.hcm_display;
-
-  // bind click events บน markers ใหม่ทุกครั้ง
-  bindMarkerClicks(mesDiv);
-});
-
-/**
- * EVENT: CHAT_CHANGED / ล้างหน้าใหม่
- * reset counter แต่เก็บ store ไว้
- */
-eventSource.on(event_types.CHAT_CHANGED, () => {
-  globalCodeCounter = 0;
-  codeStore = {};
-  refreshPanel();
-});
-
-// ══════════════════════════════════════════════════
-//  MARKER CLICK → SHOW CODE / PREVIEW
-// ══════════════════════════════════════════════════
-function bindMarkerClicks(container) {
-  container.querySelectorAll('.hcm-marker').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = parseInt(el.dataset.hcmId);
-      const entry = findEntryById(id);
-      if (!entry) return;
-
-      const s = getSettings();
-      if (s.showPreview) {
-        showCodePopup(entry);
-      } else {
-        copyToClipboard(entry.html);
-        showToast(`📋 code${id} copied!`);
-      }
+function scanPatterns(text, msgId) {
+    // ข้ามถ้ามี CAL tag อยู่แล้ว
+    if (CAL_RE.test(text)) { CAL_RE.lastIndex = 0; return; }
+    CAL_RE.lastIndex = 0;
+    const hasKw = SCHEDULE_KW.some(k => text.includes(k));
+    if (!hasKw) return;
+    const times = [...text.matchAll(TIME_RE)];
+    if (!times.length) return;
+    const t = times[0][0];
+    addEvent({
+        person   : '',
+        date     : dateStr(new Date()),
+        time     : t.replace(/[h\s]/g, ':').replace('น.', '').replace('นาฬิกา', '').trim(),
+        activity : '[auto] ' + text.slice(0, 45).replace(/\n/g, ' '),
+        symbol   : 'general',
+        details  : '',
     });
-  });
 }
 
-function findEntryById(id) {
-  for (const msgId of Object.keys(codeStore)) {
-    const found = codeStore[msgId].find(e => e.id === id);
-    if (found) return found;
-  }
-  return null;
-}
-
-// ── CODE POPUP ──
-function showCodePopup(entry) {
-  // ลบ popup เก่า
-  document.getElementById('hcm-popup')?.remove();
-
-  const popup = document.createElement('div');
-  popup.id = 'hcm-popup';
-  popup.style.cssText = `
-    position:fixed; inset:0; z-index:20000;
-    background:rgba(42,74,107,0.45); backdrop-filter:blur(4px);
-    display:flex; align-items:center; justify-content:center;
-    font-family:'Quicksand',sans-serif;
-    animation: hcm-panel-in 0.3s cubic-bezier(.34,1.56,.64,1);
-  `;
-  popup.innerHTML = `
-    <div style="
-      background:#f5fbff; border:2px solid #b8dff7;
-      border-radius:20px; width:min(560px,92vw); max-height:80vh;
-      display:flex; flex-direction:column;
-      box-shadow:0 8px 40px rgba(90,179,232,0.3);
-      overflow:hidden;
-    ">
-      <div style="
-        background:linear-gradient(90deg,#b8dff7,#89c9f0);
-        padding:12px 16px; display:flex; align-items:center; gap:10px;
-      ">
-        <span style="font-size:18px;">📄</span>
-        <span style="font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:#2a4a6b;flex:1;">
-          &lt;code${entry.id}&gt; — ~${entry.tokens} tokens
-        </span>
-        <span id="hcm-popup-copy" style="
-          background:white;border:1.5px solid #5ab3e8;border-radius:20px;
-          padding:3px 12px;font-size:10px;font-weight:700;color:#5ab3e8;
-          cursor:pointer;font-family:'Nunito',sans-serif;
-        ">📋 Copy</span>
-        <span id="hcm-popup-close" style="
-          width:24px;height:24px;background:rgba(255,255,255,0.7);
-          border:1.5px solid #5ab3e8;border-radius:50%;
-          cursor:pointer;display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:700;color:#2a4a6b;
-        ">✕</span>
-      </div>
-
-      <!-- TABS: Code / Preview -->
-      <div style="display:flex;background:#d6eeff;border-bottom:2px solid #b8dff7;padding:0 12px;">
-        <div id="hcm-ptab-code" style="
-          padding:7px 12px;font-size:11px;font-weight:700;
-          color:#5ab3e8;border-bottom:2.5px solid #5ab3e8;
-          cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:-2px;
-        ">💻 Source</div>
-        <div id="hcm-ptab-preview" style="
-          padding:7px 12px;font-size:11px;font-weight:700;
-          color:#9bbdd4;border-bottom:2.5px solid transparent;
-          cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:-2px;
-        ">✨ Preview</div>
-      </div>
-
-      <!-- Source -->
-      <div id="hcm-psrc" style="padding:12px;overflow-y:auto;flex:1;">
-        <pre style="
-          background:#d6eeff;border-radius:10px;padding:10px 12px;
-          font-family:'Courier New',monospace;font-size:10.5px;
-          color:#2a4a6b;overflow-x:auto;white-space:pre-wrap;
-          word-break:break-all;line-height:1.6;margin:0;
-        ">${escapeHtml(entry.html)}</pre>
-      </div>
-
-      <!-- Preview -->
-      <div id="hcm-pprev" style="display:none;padding:12px;overflow-y:auto;flex:1;">
-        <div style="
-          border:2px dashed #b8dff7;border-radius:12px;
-          padding:16px;min-height:100px;
-          background:white;
-        ">
-          ${entry.html}
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(popup);
-
-  // Tab switching
-  popup.querySelector('#hcm-ptab-code').addEventListener('click', () => {
-    popup.querySelector('#hcm-psrc').style.display = 'block';
-    popup.querySelector('#hcm-pprev').style.display = 'none';
-    popup.querySelector('#hcm-ptab-code').style.color = '#5ab3e8';
-    popup.querySelector('#hcm-ptab-code').style.borderBottomColor = '#5ab3e8';
-    popup.querySelector('#hcm-ptab-preview').style.color = '#9bbdd4';
-    popup.querySelector('#hcm-ptab-preview').style.borderBottomColor = 'transparent';
-  });
-  popup.querySelector('#hcm-ptab-preview').addEventListener('click', () => {
-    popup.querySelector('#hcm-psrc').style.display = 'none';
-    popup.querySelector('#hcm-pprev').style.display = 'block';
-    popup.querySelector('#hcm-ptab-preview').style.color = '#5ab3e8';
-    popup.querySelector('#hcm-ptab-preview').style.borderBottomColor = '#5ab3e8';
-    popup.querySelector('#hcm-ptab-code').style.color = '#9bbdd4';
-    popup.querySelector('#hcm-ptab-code').style.borderBottomColor = 'transparent';
-  });
-
-  popup.querySelector('#hcm-popup-copy').addEventListener('click', () => {
-    copyToClipboard(entry.html);
-    popup.querySelector('#hcm-popup-copy').textContent = '✓ Copied!';
-    setTimeout(() => { popup.querySelector('#hcm-popup-copy').textContent = '📋 Copy'; }, 1500);
-  });
-  popup.querySelector('#hcm-popup-close').addEventListener('click', () => popup.remove());
-  popup.addEventListener('click', e => { if (e.target === popup) popup.remove(); });
-}
-
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-  });
-}
-
-// ══════════════════════════════════════════════════
-//  UI: BUILD LAUNCHER + PANEL
-// ══════════════════════════════════════════════════
-function buildUI() {
-  // ── Launcher ──
-  const launcher = document.createElement('div');
-  launcher.id = 'hcm-launcher';
-  launcher.innerHTML = `
-    <div id="hcm-bubble">
-      🌸
-      <div id="hcm-notif">0</div>
-    </div>
-    <div id="hcm-launcher-label">Code Manager</div>
-    <div id="hcm-launcher-base"></div>
-  `;
-  document.body.appendChild(launcher);
-
-  // Drag
-  makeDraggable(launcher, document.getElementById('hcm-bubble'));
-
-  // Click toggle
-  launcher.querySelector('#hcm-bubble').addEventListener('click', togglePanel);
-
-  // ── Panel ──
-  const panel = document.createElement('div');
-  panel.id = 'hcm-panel';
-  panel.innerHTML = `
-    <div id="hcm-header">
-      <div class="hcm-header-icon">🌸</div>
-      <div class="hcm-header-text">
-        <h2>HTML Code Manager</h2>
-        <p>✦ SillyTavern Extension ✦</p>
-      </div>
-      <div id="hcm-close">✕</div>
-    </div>
-
-    <div id="hcm-tabs">
-      <div class="hcm-tab hcm-active" data-tab="codes">
-        🗂 Codes <span class="hcm-tab-badge" id="hcm-count-badge">0</span>
-      </div>
-      <div class="hcm-tab" data-tab="settings">⚙ Settings</div>
-      <div class="hcm-tab" data-tab="about">✦ Info</div>
-    </div>
-
-    <div id="hcm-body">
-
-      <!-- ── TAB: CODES ── -->
-      <div class="hcm-tab-content hcm-active" id="hcm-tab-codes">
-
-        <div class="hcm-status-bar">
-          <div class="hcm-dot on" id="hcm-status-dot"></div>
-          <span id="hcm-status-text">Extension active</span>
-        </div>
-
-        <div class="hcm-stats-row">
-          <div class="hcm-stat-chip">
-            <div class="val" id="hcm-stat-total">0</div>
-            <div class="lbl">Total</div>
-          </div>
-          <div class="hcm-stat-chip">
-            <div class="val" id="hcm-stat-tokens">~0</div>
-            <div class="lbl">Tokens saved</div>
-          </div>
-        </div>
-
-        <div class="hcm-section-label">✦ Captured Blocks</div>
-        <div id="hcm-code-list"></div>
-
-        <div class="hcm-btn-row" style="margin-top:4px;">
-          <button class="hcm-btn hcm-btn-secondary" id="hcm-btn-clear" style="flex:1">🗑 Clear</button>
-          <button class="hcm-btn hcm-btn-primary" id="hcm-btn-export" style="flex:1">⬇ Export</button>
-        </div>
-      </div>
-
-      <!-- ── TAB: SETTINGS ── -->
-      <div class="hcm-tab-content" id="hcm-tab-settings">
-
-        <div class="hcm-section-label">✦ General</div>
-
-        <div class="hcm-toggle-row">
-          <div>
-            <div class="hcm-toggle-info">🔍 Auto-detect HTML</div>
-            <div class="hcm-toggle-sub">Capture HTML blocks from AI messages</div>
-          </div>
-          <label class="hcm-toggle">
-            <input type="checkbox" id="hcm-set-enabled">
-            <span class="hcm-toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="hcm-toggle-row">
-          <div>
-            <div class="hcm-toggle-info">🔁 Replace in context</div>
-            <div class="hcm-toggle-sub">Swap code with &lt;codeN&gt; in model memory</div>
-          </div>
-          <label class="hcm-toggle">
-            <input type="checkbox" id="hcm-set-replace">
-            <span class="hcm-toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="hcm-toggle-row">
-          <div>
-            <div class="hcm-toggle-info">👁 Show preview popup</div>
-            <div class="hcm-toggle-sub">Click marker → render HTML popup</div>
-          </div>
-          <label class="hcm-toggle">
-            <input type="checkbox" id="hcm-set-preview">
-            <span class="hcm-toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="hcm-toggle-row">
-          <div>
-            <div class="hcm-toggle-info">🔢 Numbered markers</div>
-            <div class="hcm-toggle-sub">Use &lt;code1&gt;, &lt;code2&gt; for multiple blocks</div>
-          </div>
-          <label class="hcm-toggle">
-            <input type="checkbox" id="hcm-set-numbered">
-            <span class="hcm-toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="hcm-section-label" style="margin-top:4px;">✦ Manual Store</div>
-        <div class="hcm-field-group">
-          <div class="hcm-field-label">Paste HTML block</div>
-          <textarea id="hcm-manual-input" placeholder="<div>...</div>"></textarea>
-        </div>
-        <button class="hcm-btn hcm-btn-primary" id="hcm-btn-manual">＋ Store Block</button>
-      </div>
-
-      <!-- ── TAB: ABOUT ── -->
-      <div class="hcm-tab-content" id="hcm-tab-about">
-        <div class="hcm-section-label">✦ How it works</div>
-        <div class="hcm-alert" style="background:linear-gradient(90deg,#f0f8ff,#e8f6ff);border-color:#b8dff7;color:#2a4a6b;">
-          ℹ️
-          <span style="line-height:1.6;">
-            Extension นี้ดักจับโค้ด HTML จาก AI response แล้วเก็บไว้ใน store
-            ใน context ที่โมเดลเห็น จะแสดงแค่ <b>&lt;code1&gt;&lt;/code1&gt;</b>
-            แทนโค้ดทั้งหมด ช่วยประหยัด token ได้มาก
-          </span>
-        </div>
-        <div class="hcm-section-label">✦ Marker format</div>
-        <div style="background:#d6eeff;border-radius:10px;padding:10px 12px;font-family:'Courier New',monospace;font-size:11px;color:#2a4a6b;line-height:2;">
-          AI sees: <b>&lt;code1&gt;&lt;/code1&gt;</b><br>
-          You see: <span class="hcm-marker">📄 code1</span><br>
-          Multiple: <b>&lt;code1&gt;</b>, <b>&lt;code2&gt;</b>, ...
-        </div>
-        <div class="hcm-alert">
-          ⭐ Detects: <b>```html...```</b> blocks and <b>&lt;html&gt;...&lt;/html&gt;</b> tags automatically.
-        </div>
-      </div>
-
-    </div>
-  `;
-  document.body.appendChild(panel);
-
-  // ── Event Bindings ──
-  document.getElementById('hcm-close').addEventListener('click', togglePanel);
-
-  // Tabs
-  panel.querySelectorAll('.hcm-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      panel.querySelectorAll('.hcm-tab').forEach(t => t.classList.remove('hcm-active'));
-      panel.querySelectorAll('.hcm-tab-content').forEach(t => t.classList.remove('hcm-active'));
-      tab.classList.add('hcm-active');
-      document.getElementById(`hcm-tab-${tab.dataset.tab}`).classList.add('hcm-active');
+function parseAttrs(str) {
+    const a = {};
+    str.split(',').forEach(pair => {
+        const i = pair.indexOf('=');
+        if (i > 0) a[pair.slice(0, i).trim()] = pair.slice(i + 1).trim();
     });
-  });
+    return a;
+}
 
-  // Settings toggles
-  const settingMap = {
-    'hcm-set-enabled':  'enabled',
-    'hcm-set-replace':  'replaceInCtx',
-    'hcm-set-preview':  'showPreview',
-    'hcm-set-numbered': 'numberedMarkers',
-  };
-  Object.entries(settingMap).forEach(([elId, key]) => {
-    const el = document.getElementById(elId);
-    el.checked = getSettings()[key];
-    el.addEventListener('change', () => {
-      getSettings()[key] = el.checked;
-      saveSettingsDebounced();
-      updateStatusBar();
+// ═══ UI PANEL ═════════════════════════════════════════════════
+let currentSection = 'toc';
+let calView = { year: new Date().getFullYear(), month: new Date().getMonth() };
+let selectedDate  = null;
+
+function createPanel() {
+    if (document.getElementById('hcm-panel')) return;
+
+    // ── Launcher tab (right edge) ──
+    const launcher = document.createElement('div');
+    launcher.id = 'hcm-launcher';
+    launcher.innerHTML = `
+      <div id="hcm-ltab">
+        <div class="hcm-lt-gem"><span>H</span></div>
+        <div class="hcm-lt-lbl">HCM</div>
+        <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>
+      </div>`;
+    launcher.querySelector('#hcm-ltab').addEventListener('click', togglePanel);
+    document.body.appendChild(launcher);
+
+    // ── Panel ──
+    const panel = document.createElement('div');
+    panel.id = 'hcm-panel';
+    panel.innerHTML = buildHTML();
+    document.body.appendChild(panel);
+
+    bindEvents();
+    startClock();
+    refreshAllUI();
+}
+
+// ─── HTML structure ────────────────────────────────────────────
+function buildHTML() {
+    return `
+<div class="hcm-frame">
+  <div class="hcm-rings">${Array(9).fill('<div class="hcm-ring"></div>').join('')}</div>
+  <div class="hcm-bmarks">
+    <div class="hcm-bm" data-bm="code">โค้ด</div>
+    <div class="hcm-bm" data-bm="cal">ปฏิทิน</div>
+    <div class="hcm-bm" data-bm="toc">เมนู</div>
+  </div>
+  <div class="hcm-book">
+    <div class="hcm-band hcm-top"></div>
+
+    <div class="hcm-sb">
+      <div class="hcm-sb-l">
+        <div class="hcm-sb-dot"></div>
+        <span id="hcm-clock">--:--:--</span>
+        <span class="hcm-sep">·</span>
+        <span id="hcm-chatname">SillyTavern</span>
+      </div>
+      <div class="hcm-sb-r" id="hcm-charname">—</div>
+    </div>
+
+    <div class="hcm-hd">
+      <div class="hcm-hdm">
+        <span class="hcm-eyebrow" id="hcm-eyebrow">HCM Diary</span>
+        <div class="hcm-title" id="hcm-title">สารบัญระบบ</div>
+        <div class="hcm-sub" id="hcm-sub">ส่วนขยาย SillyTavern</div>
+      </div>
+      <div class="hcm-hdbtns">
+        <div class="hcm-hdbtn" id="hcm-back" style="display:none">&#8592;</div>
+        <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
+      </div>
+    </div>
+
+    <div class="hcm-drow">
+      <span class="hcm-dlbl">Date</span>
+      <div class="hcm-dval" id="hcm-date">—</div>
+    </div>
+
+    <div class="hcm-stabs" id="hcm-tabs-code">
+      <div class="hcm-stab hcm-on" data-sv="code">โค้ด <span class="hcm-tbadge" id="hcm-cnt">0</span></div>
+      <div class="hcm-stab" data-sv="settings">ตั้งค่า</div>
+    </div>
+    <div class="hcm-stabs" id="hcm-tabs-cal">
+      <div class="hcm-stab hcm-on" data-cv="month">เดือน</div>
+      <div class="hcm-stab" data-cv="list">รายการ</div>
+      <div class="hcm-stab" data-cv="add">+ เพิ่ม</div>
+    </div>
+
+    <div class="hcm-body">
+      ${buildTOC()}
+      ${buildCode()}
+      ${buildCalendar()}
+    </div>
+
+    <div class="hcm-band hcm-bot"></div>
+    <div class="hcm-hind"><div class="hcm-hbar"></div></div>
+  </div>
+</div>
+
+<div id="hcm-pop">
+  <div class="hcm-ps">
+    <div class="hcm-ph">
+      <span class="hcm-pt" id="hcm-pt">—</span>
+      <button class="hcm-pc" id="hcm-pc-btn">คัดลอก</button>
+      <div class="hcm-px" id="hcm-pop-close">&#215;</div>
+    </div>
+    <div class="hcm-ptb">
+      <div class="hcm-ptt hcm-on" data-pt="src">ซอร์สโค้ด</div>
+      <div class="hcm-ptt" data-pt="prev">พรีวิว</div>
+    </div>
+    <div class="hcm-pb">
+      <div id="hcm-ptsrc"><pre id="hcm-psrc"></pre></div>
+      <div id="hcm-ptprev" style="display:none"><div id="hcm-pprev"></div></div>
+    </div>
+  </div>
+</div>`;
+}
+
+function buildTOC() {
+    return `
+<div class="hcm-view hcm-on" id="hcm-v-toc">
+  <div class="hcm-toc-hd">
+    <span class="hcm-toc-lbl">NOTE</span>
+    <span class="hcm-toc-yr">ระบบ &amp; เครื่องมือ</span>
+  </div>
+  <div class="hcm-trow hcm-can" data-nav="code">
+    <div class="hcm-tl"><div class="hcm-tbig">C</div><div class="hcm-tabb">CODE</div></div>
+    <div class="hcm-tm">
+      <div class="hcm-tnum">ระบบที่ 01</div>
+      <div class="hcm-tname">ตัวจัดการโค้ด</div>
+      <div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div>
+    </div>
+    <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div>
+    <div class="hcm-tarrow">&#8250;</div>
+  </div>
+  <div class="hcm-trow hcm-locked">
+    <div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div>
+    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
+    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
+  </div>
+  <div class="hcm-trow hcm-locked">
+    <div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div>
+    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
+    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
+  </div>
+  <div class="hcm-trow hcm-locked" style="border-bottom:none">
+    <div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div>
+    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
+    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
+  </div>
+  <div class="hcm-note-card">
+    <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
+    <div class="hcm-nc-body">
+      AI ใส่ tag ในบทโรล → extension จับ → ลบออก → บันทึก → inject ก่อนโรลถัดไป<br><br>
+      <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
+      symbols: heart · star · diamond · note · cross · task · general
+    </div>
+  </div>
+</div>`;
+}
+
+function buildCode() {
+    return `
+<div class="hcm-view" id="hcm-v-code">
+  <div class="hcm-sv hcm-on" id="hcm-sv-code">
+    <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
+    <div class="hcm-srow">
+      <div class="hcm-sc"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
+      <div class="hcm-sc"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
+    </div>
+    <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
+    <div id="hcm-codelist"></div>
+    <div class="hcm-btns">
+      <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
+      <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export JSON</button>
+    </div>
+  </div>
+  <div class="hcm-sv" id="hcm-sv-settings" style="display:none">
+    <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
+    <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ใน context ด้วย &lt;codeN&gt;</div></div></div>
+    <div class="hcm-feat"><div class="hcm-fn"><span>II</span></div><div><div class="hcm-fname">ประหยัด token</div><div class="hcm-fdesc">~450 token → ~12 token ต่อบล็อก</div></div></div>
+    <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
+    <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">ส่งกำหนดการเข้า context ก่อนโรลทุกครั้ง</div></div></div>
+  </div>
+</div>`;
+}
+
+function buildCalendar() {
+    const symOpts = Object.entries(SYMBOL_MAP)
+        .map(([k, v]) => `<option value="${k}">${v.c} ${v.label}</option>`).join('');
+    return `
+<div class="hcm-view" id="hcm-v-cal">
+  <div class="hcm-sv hcm-on hcm-cal-full" id="hcm-calv-month">
+    <div class="hcm-cal-nav">
+      <button class="hcm-cal-nb" id="hcm-cal-prev">&#8249;</button>
+      <div class="hcm-cal-lbl" id="hcm-cal-lbl">—</div>
+      <button class="hcm-cal-nb" id="hcm-cal-next">&#8250;</button>
+    </div>
+    <div class="hcm-cal-pf">
+      <span class="hcm-cal-pfl">บุคคล</span>
+      <select class="hcm-psel" id="hcm-pfilter"><option value="">ทุกคน</option></select>
+    </div>
+    <div class="hcm-cal-dows">
+      <div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div>
+      <div>พฤ.</div><div>ศ.</div><div>ส.</div>
+    </div>
+    <div class="hcm-cal-grid" id="hcm-cal-grid"></div>
+    <div class="hcm-cal-leg" id="hcm-cal-leg"></div>
+    <div class="hcm-cal-det" id="hcm-cal-det" style="display:none"></div>
+  </div>
+
+  <div class="hcm-sv" id="hcm-calv-list" style="display:none">
+    <div class="hcm-dvd" style="margin:0 0 8px"><div class="hcm-dvdg"></div><div class="hcm-dvdt">กำหนดการทั้งหมด</div></div>
+    <div id="hcm-ev-list"></div>
+  </div>
+
+  <div class="hcm-sv" id="hcm-calv-add" style="display:none">
+    <div class="hcm-dvd" style="margin:0 0 8px"><div class="hcm-dvdg"></div><div class="hcm-dvdt">เพิ่มกำหนดการ</div></div>
+    <div class="hcm-fg"><div class="hcm-fl">บุคคล</div><input type="text" id="hcm-a-person" placeholder="ชื่อตัวละคร" class="hcm-input"></div>
+    <div class="hcm-fg"><div class="hcm-fl">วันที่</div><input type="date" id="hcm-a-date" class="hcm-input"></div>
+    <div class="hcm-fg"><div class="hcm-fl">เวลา</div><input type="time" id="hcm-a-time" class="hcm-input"></div>
+    <div class="hcm-fg"><div class="hcm-fl">กิจกรรม</div><input type="text" id="hcm-a-act" placeholder="รายละเอียดกิจกรรม" class="hcm-input"></div>
+    <div class="hcm-fg"><div class="hcm-fl">สัญลักษณ์</div><select id="hcm-a-sym" class="hcm-input">${symOpts}</select></div>
+    <div class="hcm-fg"><div class="hcm-fl">รายละเอียด</div><input type="text" id="hcm-a-detail" placeholder="โน้ตเพิ่มเติม" class="hcm-input"></div>
+    <button class="hcm-btnp" id="hcm-add-save">&#43; บันทึก</button>
+  </div>
+</div>`;
+}
+
+// ═══ EVENT BINDING ════════════════════════════════════════════
+function bindEvents() {
+    // Close / back
+    document.getElementById('hcm-close').addEventListener('click', () => togglePanel());
+    document.getElementById('hcm-back' ).addEventListener('click', navBack);
+
+    // Bookmark navigation
+    document.querySelectorAll('.hcm-bm').forEach(bm => {
+        bm.addEventListener('click', () => {
+            const target = bm.dataset.bm;
+            if (!panelOpen()) openPanel();
+            if (target === 'toc') navBack();
+            else openSection(target);
+        });
     });
-  });
 
-  // Buttons
-  document.getElementById('hcm-btn-clear').addEventListener('click', () => {
-    codeStore = {};
-    globalCodeCounter = 0;
-    refreshPanel();
-  });
-  document.getElementById('hcm-btn-export').addEventListener('click', exportCodes);
-  document.getElementById('hcm-btn-manual').addEventListener('click', () => {
-    const val = document.getElementByI
+    // TOC row click
+    document.querySelectorAll('.hcm-trow.hcm-can').forEach(row => {
+        row.addEventListener('click', () => openSection(row.dataset.nav));
+    });
+
+    // Code sub-tabs
+    document.querySelectorAll('#hcm-tabs-code .hcm-stab').forEach(t =>
+        t.addEventListener('click', () => switchSub('code', t.dataset.sv))
+    );
+
+    // Cal sub-tabs
+    document.querySelectorAll('#hcm-tabs-cal .hcm-stab').forEach(t =>
+        t.addEventListener('click', () => {
+            switchSub('cal', t.dataset.cv);
+            if (t.dataset.cv === 'month') renderCalGrid();
+            if (t.dataset.cv === 'list')  renderCalList();
+        })
+    );
+
+    // Calendar nav
+    document.getElementById('hcm-cal-prev').addEventListener('click', () => {
+        calView.month--;
+        if (calView.month < 0) { calView.month = 11; calView.year--; }
+        renderCalGrid();
+    });
+    document.getElementById('hcm-cal-next').addEventListener('click', () => {
+        calView.month++;
+        if (calView.month > 11) { calView.month = 0; calView.year++; }
+        render
