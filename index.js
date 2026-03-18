@@ -1,4 +1,3 @@
-
 /**
  * HCM Diary v2.2 — no imports, window globals only
  */
@@ -240,7 +239,7 @@ function buildHTML() {
           <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
           <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
         </div>
-                            <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-note-card">
@@ -436,50 +435,20 @@ function initDrag() {
     ovl.addEventListener   ('touchend',       endMove);
     ovl.addEventListener   ('touchcancel',    endMove);
 
-    // ═══ RESIZE ═══
-    if (!rHandle) return;
-    let ry = 0, rh = 0, resizeOn = false;
-
-    const rovl = document.createElement('div');
-    rovl.id = 'hcm-resize-ovl';
-    rovl.style.cssText = [
-        'position:fixed', 'inset:0', 'z-index:2147483647',
-        'display:none', 'touch-action:none', 'cursor:ns-resize'
-    ].join(';');
-    document.body.appendChild(rovl);
-
-    function startResize(cy) {
-        resizeOn = true; ry = cy; rh = panel.offsetHeight;
-        panel.style.transition = 'none';
-        rovl.style.display     = 'block';
+    // ═══ BOTTOM BAR — also drag to move ═══
+    const bHandle = document.getElementById('hcm-resize-handle')
+                 || document.querySelector('.hcm-hind');
+    if (bHandle) {
+        bHandle.addEventListener('mousedown',  e => { e.preventDefault(); startMove(e.clientX, e.clientY); });
+        bHandle.addEventListener('touchstart', e => { e.preventDefault(); startMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
     }
-    function doResize(cy) {
-        if (!resizeOn) return;
-        const newH = Math.max(260, Math.min(window.innerHeight - 20, rh + (cy - ry)));
-        panel.style.height = panel.style.maxHeight = newH + 'px';
-        const sc = document.getElementById('hcm-sc');
-        if (sc) { sc.width = panel.offsetWidth; sc.height = newH; }
-    }
-    function endResize() {
-        if (!resizeOn) return;
-        resizeOn = false;
-        panel.style.transition = '';
-        rovl.style.display     = 'none';
-    }
-
-    rHandle.addEventListener('mousedown',  e => { e.preventDefault(); startResize(e.clientY); });
-    rovl.addEventListener   ('mousemove',  e => doResize(e.clientY));
-    rovl.addEventListener   ('mouseup',    endResize);
-    rHandle.addEventListener('touchstart', e => { e.preventDefault(); startResize(e.touches[0].clientY); }, { passive: false });
-    rovl.addEventListener   ('touchmove',  e => { e.preventDefault(); doResize(e.touches[0].clientY); }, { passive: false });
-    rovl.addEventListener   ('touchend',   endResize);
-    rovl.addEventListener   ('touchcancel',endResize);
 }
 
 
 function bindEvents() {
     document.getElementById('hcm-close').addEventListener('click', togglePanel);
     document.getElementById('hcm-back' ).addEventListener('click', navBack);
+
     document.querySelectorAll('.hcm-bm').forEach(bm => bm.addEventListener('click', () => {
         if (!isOpen) openPanel();
         if (bm.dataset.bm === 'toc') navBack(); else openSec(bm.dataset.bm);
@@ -533,7 +502,7 @@ function openPanel() {
         p.style.left = Math.max(4, Math.round((window.innerWidth - pw) / 2)) + 'px';
         p.style.top  = '50%';
         p.style.transform = 'translateY(-50%)';
-        p.style.right = 'auto';
+            p.style.right = 'auto';
     }
 }
 function closePanel() { isOpen = false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
@@ -785,5 +754,3 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
-            
-                        
