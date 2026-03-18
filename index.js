@@ -1022,4 +1022,5 @@ if (document.readyState === 'loading') {
     } else {
         hcmInit();
     }
-        }
+}
+ 
