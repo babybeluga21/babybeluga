@@ -1,3 +1,4 @@
+
 /* HCM Diary v2.2 */
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400;1,700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
@@ -16,7 +17,7 @@
 #hcm-launcher {
   position:fixed !important;
   right:0 !important;
-  top:72% !important;
+  top:78% !important;
   bottom:auto !important;
   transform:translateY(-50%) !important;
   z-index:99999 !important;
@@ -135,6 +136,7 @@
   background:linear-gradient(rgba(255,255,255,.03),transparent);
   pointer-events:none; z-index:7;
 }
+
 /* bands */
 .hcm-band { flex-shrink:0; height:3px; position:relative; z-index:10; }
 .hcm-top  { background:linear-gradient(90deg,var(--pk4),var(--pk3) 30%,var(--lv2) 60%,var(--go) 80%,var(--pk4)); box-shadow:0 0 8px rgba(200,140,230,.4); }
@@ -409,4 +411,3 @@
 .hcm-ptt.hcm-on { color:var(--pk2); border-bottom-color:var(--pk3); }
 .hcm-pb { flex:1; overflow-y:auto; padding:11px; }
 #hcm-pprev { border:1px solid var(--bdr); padding:12px; min-height:60px; background:white; }
-              
