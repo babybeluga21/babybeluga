@@ -17,7 +17,7 @@
 #hcm-launcher {
   position:fixed !important;
   right:0 !important;
-  top:78% !important;
+  top:80% !important;
   bottom:auto !important;
   transform:translateY(-50%) !important;
   z-index:99999 !important;
@@ -29,6 +29,7 @@
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
   box-shadow:-2px 0 14px rgba(0,0,0,.55), 0 0 0 1px rgba(200,130,180,.15);
   overflow:hidden; transition:width .15s;
+  touch-action:none;
 }
 #hcm-launcher:hover { width:34px; }
 #hcm-launcher::before {
@@ -150,6 +151,8 @@
   display:flex; align-items:center; justify-content:space-between;
   position:relative; z-index:10;
   cursor:grab;
+  touch-action:none;
+  -webkit-user-select:none; user-select:none;
 }
 .hcm-sb:active { cursor:grabbing; }
 .hcm-sb::after {
