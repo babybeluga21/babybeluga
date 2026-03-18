@@ -1,1010 +1,588 @@
-/**
- * HCM Diary Extension v2.1
- * ใช้ global variables ของ ST — ไม่มี import statement
- */
+/* ═══════════════════════════════════════════════════════════════
+   HCM Diary Extension v2.1 — Styles
+   Glass / Dark Space / Starry theme
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,400;1,700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
-console.log('[HCM] index.js parsing...');
-
-// ── ST globals (ไม่ใช้ import) ──────────────────────────────────
-const getContext          = () => window.SillyTavern?.getContext?.() ?? {};
-const saveSettingsDebounced = window.saveSettingsDebounced ?? (() => {});
-const eventSource         = window.eventSource;
-const event_types         = window.event_types ?? {};
-const extension_settings  = window.extension_settings ?? {};
-const _setPrompt          = window.setExtensionPrompt ?? (() => {});
-
-// ═══ CONSTANTS ════════════════════════════════════════════════
-const EXT      = 'hcm_diary';
-const INJ_KEY  = 'hcm_calendar';
-const INJ_POS  = 1;   // position: after system prompt, before chat
-const INJ_DEPTH = 0;
-
-const CAL_RE  = /\[CAL:([^\]]+)\]/gi;
-const HTML_RE = /```html\s*([\s\S]*?)```/gi;
-
-const SYMBOL_MAP = {
-    heart   : { c: '\u2665', label: 'นัดพบ',        color: '#e87098' },
-    star    : { c: '\u2605', label: 'สำคัญ',         color: '#e8c870' },
-    diamond : { c: '\u25C6', label: 'ประชุม',        color: '#9898e8' },
-    note    : { c: '\u266A', label: 'บันเทิง',       color: '#70c898' },
-    cross   : { c: '\u271D', label: 'ขัดแย้ง',       color: '#e87070' },
-    task    : { c: '\u2295', label: 'งาน/ภารกิจ',   color: '#88a8d8' },
-    general : { c: '\u25C7', label: 'ทั่วไป',        color: '#a898c8' },
-};
-
-// ═══ SETTINGS ═════════════════════════════════════════════════
-const DEFAULTS = {
-    enabled         : true,
-    calendarEnabled : true,
-    codeEnabled     : true,
-    calendarData    : {},  // { [chatId]: { events: [] } }
-    codeData        : {},  // { [chatId]: { blocks: [] } }
-};
-
-function S() {
-    const store = window.extension_settings;
-    if (!store) return DEFAULTS;  // ถ้า ST ยังไม่พร้อม
-    if (!store[EXT]) store[EXT] = {};
-    for (const k in DEFAULTS) {
-        if (store[EXT][k] === undefined)
-            store[EXT][k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
-    }
-    return store[EXT];
+/* ─── CSS Variables ─────────────────────────────────────────── */
+#hcm-panel, #hcm-launcher, #hcm-pop {
+  --pk:  #e890b8; --pk2: #f0b0cc; --pk3: #c96090; --pk4: #8c3868;
+  --lv:  #b8a0e0; --lv2: #cfc0f0; --lv4: #604880;
+  --go:  #ddc080; --go2: #eed898; --god: rgba(220,192,120,.32);
+  --ink: rgba(255,255,255,.92);
+  --ik2: rgba(255,255,255,.65);
+  --ik3: rgba(255,255,255,.38);
+  --ik4: rgba(255,255,255,.20);
+  --bdr: rgba(255,255,255,.09);
+  font-family: 'Sarabun', sans-serif;
 }
 
-function getChatId() {
-    try { return getContext().chatId || 'default'; } catch { return 'default'; }
+/* ─── Launcher Tab ──────────────────────────────────────────── */
+#hcm-launcher {
+  position: fixed !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 99999 !important;
+  pointer-events: all !important;
+}
+#hcm-ltab {
+  width: 32px; padding: 13px 5px 11px;
+  display: flex !important; flex-direction: column; align-items: center; gap: 7px;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,.25) !important;
+  border-right: none; border-radius: 4px 0 0 4px;
+  background: rgba(140,56,104,.9) !important;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: -3px 0 20px rgba(0,0,0,.6) !important;
+  transition: width .17s; position: relative; overflow: hidden;
+}
+#hcm-ltab::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--pk3), var(--lv), var(--go));
+}
+#hcm-ltab:hover { width: 38px; }
+.hcm-lt-gem {
+  width: 20px; height: 20px; border: 1.5px solid rgba(220,180,100,.4);
+  transform: rotate(45deg); display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.04);
+}
+.hcm-lt-gem span {
+  transform: rotate(-45deg);
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 10px; font-weight: 700; color: var(--pk2);
+}
+.hcm-lt-lbl {
+  writing-mode: vertical-rl; font-size: 6px; font-weight: 600;
+  color: var(--ik3); letter-spacing: 1.5px;
+}
+#hcm-bdg {
+  width: 14px; height: 14px; background: var(--pk3);
+  transform: rotate(45deg); display: flex; align-items: center; justify-content: center;
+}
+#hcm-bdg span {
+  transform: rotate(-45deg); font-size: 7px; font-weight: 900; color: white;
 }
 
-// ═══ CALENDAR DATA ════════════════════════════════════════════
-function calData() {
-    const s = S(), id = getChatId();
-    if (!s.calendarData[id]) s.calendarData[id] = { events: [] };
-    return s.calendarData[id];
+/* ─── Panel ─────────────────────────────────────────────────── */
+#hcm-panel {
+  position: fixed !important; right: -430px; top: 50%; transform: translateY(-50%);
+  width: 365px; max-height: 92vh; z-index: 99998 !important;
+  transition: right .38s cubic-bezier(.32,0,.2,1);
+  pointer-events: all !important;
+}
+#hcm-panel.hcm-open { right: 30px !important; }
+
+.hcm-frame { position: relative; padding-left: 12px; }
+
+/* spine rings */
+.hcm-rings {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 12px;
+  display: flex; flex-direction: column; justify-content: space-evenly;
+  align-items: center; padding: 18px 0; z-index: 30; pointer-events: none;
+}
+.hcm-ring {
+  width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid rgba(180,140,220,.3);
+  background: radial-gradient(circle at 32% 28%, rgba(190,150,230,.5), rgba(24,16,44,.8));
+  box-shadow: 0 1px 5px rgba(0,0,0,.55);
 }
 
-function addEvent(evt) {
-    const events = calData().events;
-    // ป้องกัน duplicate จาก re-render
-    const dup = events.find(e =>
-        e.date === evt.date && e.time === evt.time &&
-        e.person === evt.person && e.activity === evt.activity
-    );
-    if (dup) return;
-    events.push({ id: Date.now() + Math.random(), ...evt });
-    saveSettingsDebounced();
-    updateInjection();
-    refreshCalUI();
+/* bookmarks */
+.hcm-bmarks {
+  position: absolute; right: -1px; top: 20px;
+  display: flex; flex-direction: column; gap: 2px; z-index: 20;
+}
+.hcm-bm {
+  width: 14px; height: 50px; display: flex; align-items: center; justify-content: center;
+  font-size: 5px; font-weight: 700; color: rgba(255,255,255,.72);
+  writing-mode: vertical-rl; letter-spacing: .5px; text-transform: uppercase;
+  cursor: pointer; user-select: none;
+  border-left: 1px solid rgba(255,255,255,.07);
+  transition: width .15s, filter .15s;
+}
+.hcm-bm:hover { filter: brightness(1.28); width: 18px; }
+.hcm-bm:nth-child(1) { background: linear-gradient(180deg, #6840a0, #4828a0); }
+.hcm-bm:nth-child(2) { background: linear-gradient(180deg, #a83878, #883068); }
+.hcm-bm:nth-child(3) { background: linear-gradient(180deg, #3858b0, #2840a0); height: 44px; }
+.hcm-bm.hcm-active {
+  width: 18px;
+  border-left: 2px solid rgba(220,190,255,.35);
+  box-shadow: -2px 0 10px rgba(200,160,255,.18);
 }
 
-function removeEvent(id) {
-    const d = calData();
-    d.events = d.events.filter(e => e.id !== id);
-    saveSettingsDebounced();
-    updateInjection();
-    refreshCalUI();
+/* glass book */
+.hcm-book {
+  background: rgba(12,8,26,.32);
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(255,255,255,.08); border-right: none;
+  box-shadow:
+    inset 1px 0 0 rgba(255,255,255,.05),
+    inset 0 1px 0 rgba(255,255,255,.04),
+    -4px 0 40px rgba(0,0,0,.55),
+    0 0 0 1px rgba(180,140,220,.08);
+  display: flex; flex-direction: column;
+  max-height: 92vh; overflow: hidden; position: relative;
+}
+/* grid overlay */
+.hcm-book::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.013) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.013) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* top frost */
+.hcm-book::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 70px;
+  background: linear-gradient(rgba(255,255,255,.03), transparent);
+  pointer-events: none; z-index: 2;
 }
 
-// ─── Build injection text ──────────────────────────────────────
-function updateInjection() {
-    if (!S().calendarEnabled) {
-        _setPrompt(INJ_KEY, '', INJ_POS, INJ_DEPTH);
-        return;
-    }
-    const events = calData().events;
-    if (!events.length) {
-        _setPrompt(INJ_KEY, '', INJ_POS, INJ_DEPTH);
-        return;
-    }
-
-    const now    = new Date();
-    const todayS = dateStr(now);
-    const timeS  = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    const sorted = [...events].sort((a, b) =>
-        (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`)
-    );
-    const upcoming = sorted.filter(e => (e.date || '') >= todayS);
-
-    let text = `[ปฏิทินตัวละคร — ${todayS} เวลา ${timeS}]\n`;
-    if (!upcoming.length) {
-        text += '(ไม่มีกำหนดการที่จะถึง)';
-    } else {
-        upcoming.slice(0, 15).forEach(e => {
-            const when = e.date === todayS ? 'วันนี้' : e.date;
-            text += `• ${when} ${e.time || '--:--'} | ${e.person || 'ทุกคน'} | ${e.activity || ''}`;
-            if (e.details) text += ` — ${e.details}`;
-            text += '\n';
-        });
-    }
-    text += '[/ปฏิทินตัวละคร]';
-
-    _setPrompt(INJ_KEY, text, INJ_POS, INJ_DEPTH);
+/* bands */
+.hcm-band { flex-shrink: 0; height: 3px; position: relative; z-index: 10; }
+.hcm-top {
+  background: linear-gradient(90deg, var(--pk4), var(--pk3) 30%, var(--lv2) 60%, var(--go) 80%, var(--pk4));
+  box-shadow: 0 0 8px rgba(200,140,230,.4);
+}
+.hcm-bot {
+  background: linear-gradient(90deg, var(--lv4), var(--lv) 50%, var(--pk3));
+  box-shadow: 0 0 6px rgba(160,120,200,.3);
 }
 
-// ═══ CODE DATA ════════════════════════════════════════════════
-let globalCounter = 0;
+/* status bar */
+.hcm-sb {
+  flex-shrink: 0; background: rgba(255,255,255,.028);
+  border-bottom: 1px solid var(--bdr);
+  padding: 4px 17px 4px 11px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: relative; z-index: 10;
+}
+.hcm-sb::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(200,170,240,.3), transparent);
+}
+.hcm-sb-l { display: flex; align-items: center; gap: 5px; font-size: 8px; color: var(--ik3); }
+.hcm-sb-dot {
+  width: 4px; height: 4px; background: var(--lv2); transform: rotate(45deg);
+  flex-shrink: 0; box-shadow: 0 0 6px var(--lv);
+}
+.hcm-sep { opacity: .3; }
+.hcm-sb-r { font-size: 8px; color: var(--ik4); }
 
-function codeData() {
-    const s = S(), id = getChatId();
-    if (!s.codeData[id]) s.codeData[id] = { blocks: [] };
-    return s.codeData[id];
+/* header */
+.hcm-hd {
+  flex-shrink: 0; padding: 10px 17px 10px 11px; border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: flex-start; gap: 8px; position: relative; z-index: 10;
+  background: linear-gradient(rgba(255,255,255,.02), transparent);
+}
+.hcm-hd::after {
+  content: ''; position: absolute; bottom: 0; left: 11px; right: 17px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--god), transparent);
+}
+.hcm-hdm { flex: 1; }
+.hcm-eyebrow {
+  display: block; font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 8px; color: var(--pk2); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 2px;
+}
+.hcm-title {
+  font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 700;
+  font-size: 22px; color: white; line-height: 1;
+  text-shadow: 0 0 22px rgba(190,130,220,.35);
+}
+.hcm-sub { font-size: 8px; color: var(--ik3); margin-top: 4px; }
+.hcm-hdbtns { display: flex; gap: 4px; margin-top: 4px; }
+.hcm-hdbtn {
+  width: 22px; height: 22px; border: 1px solid var(--bdr);
+  background: rgba(255,255,255,.05); backdrop-filter: blur(4px);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--ik3);
+  font-family: 'Cormorant Garamond', serif; font-weight: 700;
+  transition: background .12s, color .12s;
+}
+.hcm-hdbtn:hover { background: rgba(255,255,255,.12); color: white; }
+
+/* date row */
+.hcm-drow {
+  flex-shrink: 0; padding: 4px 17px 4px 11px; border-bottom: 1px solid var(--bdr);
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(255,255,255,.018); z-index: 10;
+}
+.hcm-dlbl {
+  font-family: 'Cormorant Garamond', serif; font-size: 12px;
+  font-weight: 600; font-style: italic; color: var(--lv2);
+}
+.hcm-dval {
+  font-size: 8px; color: var(--go2); padding: 2px 10px;
+  border: 1px solid rgba(220,192,120,.18); background: rgba(220,192,120,.05);
+  position: relative;
+}
+.hcm-dval::before, .hcm-dval::after {
+  content: ''; position: absolute; width: 5px; height: 5px;
+  border-color: var(--go); border-style: solid;
+}
+.hcm-dval::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.hcm-dval::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+/* sub-tabs */
+.hcm-stabs {
+  display: none; background: rgba(255,255,255,.02);
+  border-bottom: 1px solid var(--bdr);
+  flex-shrink: 0; padding: 0 17px 0 11px; z-index: 10;
+}
+.hcm-stab {
+  display: inline-block; padding: 6px 10px 5px; font-size: 9px; font-weight: 600;
+  color: var(--ik3); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .13s, border-color .13s;
+}
+.hcm-stab:hover { color: var(--ik2); }
+.hcm-stab.hcm-on { color: var(--pk2); border-bottom-color: var(--pk3); }
+.hcm-tbadge {
+  background: var(--pk3); color: white; font-size: 7px;
+  padding: 1px 4px; margin-left: 3px; vertical-align: middle; display: inline-block;
 }
 
-function addBlock(html, msgId) {
-    globalCounter++;
-    const block = {
-        id     : globalCounter,
-        html,
-        msgId,
-        tokens : Math.ceil(html.length / 4),
-        ts     : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-    };
-    codeData().blocks.push(block);
-    saveSettingsDebounced();
-    refreshCodeUI();
-    return block;
+/* scroll body */
+.hcm-body {
+  flex: 1; overflow-y: auto; position: relative; z-index: 10;
+  background: transparent;
+  scrollbar-width: thin; scrollbar-color: rgba(180,120,200,.25) transparent;
+}
+.hcm-body::-webkit-scrollbar { width: 3px; }
+.hcm-body::-webkit-scrollbar-thumb { background: rgba(180,120,200,.25); border-radius: 2px; }
+
+.hcm-view { display: none; flex-direction: column; }
+.hcm-view.hcm-on { display: flex; }
+
+/* sub-views — hidden by default, shown via JS */
+.hcm-sv { display: none; flex-direction: column; padding: 10px 15px 12px 11px; }
+/* calendar month view: no padding (has its own internal sections) */
+#hcm-calv-month { padding: 0; }
+
+/* ─── TOC ────────────────────────────────────────────────────── */
+.hcm-toc-hd {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 9px 15px 7px 11px; border-bottom: 1px solid var(--bdr); position: relative;
+}
+.hcm-toc-hd::after {
+  content: ''; position: absolute; bottom: 0; left: 11px; right: 15px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--god), transparent);
+}
+.hcm-toc-lbl {
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 9px; color: var(--ik3); letter-spacing: 4px; text-transform: uppercase;
+}
+.hcm-toc-yr {
+  font-family: 'Cormorant Garamond', serif; font-size: 14px; font-weight: 700;
+  font-style: italic; color: var(--lv2);
+}
+.hcm-trow {
+  display: flex; align-items: stretch; border-bottom: 1px solid var(--bdr);
+  min-height: 50px; position: relative; transition: background .13s;
+}
+.hcm-trow.hcm-can { cursor: pointer; }
+.hcm-trow.hcm-can:hover { background: rgba(255,255,255,.038); }
+.hcm-trow.hcm-can:hover .hcm-tarrow {
+  opacity: 1; color: var(--pk2); transform: translateY(-50%) translateX(2px);
+}
+.hcm-trow.hcm-locked { opacity: .32; cursor: default; }
+.hcm-tl {
+                     width: 43px; flex-shrink: 0; border-right: 1px solid var(--bdr);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px; position: relative;
+}
+.hcm-trow.hcm-can .hcm-tl::before {
+  content: ''; position: absolute; left: 0; top: 18%; bottom: 18%;
+  width: 2px; background: linear-gradient(to bottom, transparent, var(--pk), transparent);
+}
+.hcm-tbig {
+  font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 700;
+  font-size: 26px; color: var(--lv2); line-height: 1;
+  text-shadow: 0 0 12px rgba(180,150,240,.3);
+}
+.hcm-tabb { font-size: 5.5px; font-weight: 700; color: var(--ik4); letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+.hcm-tm   { flex: 1; padding: 8px 8px 7px 10px; display: flex; flex-direction: column; gap: 2px; }
+.hcm-tnum { font-family: 'Cormorant Garamond', serif; font-size: 8px; color: var(--ik4); font-style: italic; letter-spacing: 1px; }
+.hcm-tname { font-size: 12px; font-weight: 600; color: var(--ink); }
+.hcm-tdesc { font-size: 8.5px; color: var(--ik3); }
+.hcm-trow.hcm-locked .hcm-tbig  { color: var(--ik4); text-shadow: none; }
+.hcm-trow.hcm-locked .hcm-tname { color: var(--ik3); }
+.hcm-tr { width: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding-right: 11px; }
+.hcm-tgem {
+  width: 24px; height: 24px; transform: rotate(45deg);
+  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05);
+  display: flex; align-items: center; justify-content: center;
+}
+.hcm-tgem span { transform: rotate(-45deg); font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 8px; color: var(--lv2); }
+.hcm-tgem.hcm-grey { border-color: var(--bdr); background: rgba(255,255,255,.03); }
+.hcm-tgem.hcm-grey span { color: var(--ik4); }
+.hcm-tarrow {
+  position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--ik4); opacity: .22;
+  transition: opacity .14s, color .14s, transform .14s;
+  font-family: 'Cormorant Garamond', serif; font-weight: 700;
 }
 
-function removeBlock(id) {
-    codeData().blocks = codeData().blocks.filter(b => b.id !== id);
-    saveSettingsDebounced();
-    refreshCodeUI();
+/* note card */
+.hcm-note-card {
+  margin: 10px 11px; padding: 11px 13px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.035); position: relative;
+}
+.hcm-note-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--god), transparent);
+}
+.hcm-nc-title {
+  font-family: 'Cormorant Garamond', serif; font-size: 13px; font-weight: 700;
+  font-style: italic; color: var(--pk2); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.hcm-nc-title::before { content: '◆'; font-size: 7px; color: var(--go); }
+.hcm-nc-body {
+  font-size: 9px; color: var(--ik2); line-height: 1.75;
+  background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.06); padding: 7px 10px;
+}
+.hcm-nc-body code {
+  font-size: 8px; background: rgba(200,100,150,.14); padding: 1px 4px;
+  border: 1px solid rgba(200,100,150,.2); font-family: 'Courier New', monospace; color: var(--pk2);
 }
 
-// ═══ MESSAGE PROCESSING ═══════════════════════════════════════
-function processMessage(messageId) {
-    const ctx = getContext();
-    if (!ctx.chat || !ctx.chat[messageId]) return;
-    const msg = ctx.chat[messageId];
-    if (msg.is_user) return;
+/* divider */
+.hcm-dvd { display: flex; align-items: center; gap: 7px; margin: 8px 0 5px; }
+.hcm-dvd::before { content: ''; flex: 1; height: 1px; background: linear-gradient(to right, transparent, rgba(190,130,210,.35)); }
+.hcm-dvd::after  { content: ''; flex: 1; height: 1px; background: linear-gradient(to left,  transparent, rgba(190,130,210,.35)); }
+.hcm-dvdg { width: 5px; height: 5px; background: var(--pk3); transform: rotate(45deg); flex-shrink: 0; }
+.hcm-dvdt { font-family: 'Cormorant Garamond', serif; font-size: 12px; font-weight: 600; font-style: italic; color: var(--pk2); white-space: nowrap; }
 
-    let text  = msg.mes;
-    let dirty = false;
-
-    // ─ Method A: [CAL:...] tags ─
-    if (S().calendarEnabled) {
-        const hits = [...text.matchAll(CAL_RE)];
-        hits.forEach(m => {
-            const a = parseAttrs(m[1]);
-            if (a.activity || a.date) {
-                addEvent({
-                    person   : a.person   || '',
-                    date     : a.date     || dateStr(new Date()),
-                    time     : a.time     || '',
-                    activity : a.activity || '',
-                    symbol   : a.symbol   || 'general',
-                    details  : a.details  || '',
-                });
-            }
-        });
-        if (hits.length) {
-            text  = text.replace(CAL_RE, '').replace(/\n{3,}/g, '\n\n').trim();
-            dirty = true;
-        }
-        CAL_RE.lastIndex = 0;
-    }
-
-    // ─ Method B: regex scan for time keywords ─
-    if (S().calendarEnabled) {
-        scanPatterns(text, messageId);
-    }
-
-    // ─ Code block extraction ─
-    if (S().codeEnabled) {
-        const htmlHits = [...text.matchAll(HTML_RE)];
-        if (htmlHits.length) {
-            htmlHits.forEach(m => addBlock(m[1].trim(), messageId));
-            let idx = 0;
-            text = text.replace(HTML_RE, () => {
-                const blocks = codeData().blocks;
-                const b = blocks[blocks.length - htmlHits.length + idx];
-                idx++;
-                return b ? `<code${b.id}></code${b.id}>` : '';
-            }).trim();
-            dirty = true;
-            HTML_RE.lastIndex = 0;
-        }
-    }
-
-    if (dirty) {
-        msg.mes = text;
-        const el = document.querySelector(`[mesid="${messageId}"] .mes_text`);
-        if (el) el.innerHTML = msg.mes;
-        // update badge
-        updateBadge();
-    }
+/* status pill */
+.hcm-spill {
+  border: 1px solid var(--bdr); padding: 6px 11px;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 10px; color: var(--ik2); margin-bottom: 8px;
+  background: rgba(255,255,255,.04);
+}
+.hcm-sdot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: #5cdd9a; box-shadow: 0 0 0 3px rgba(92,221,154,.12);
+  animation: hcmPulse 2.5s infinite;
+}
+@keyframes hcmPulse {
+  0%,100% { box-shadow: 0 0 0 3px rgba(92,221,154,.12); }
+  50%      { box-shadow: 0 0 0 6px rgba(92,221,154,.03); }
 }
 
-// Method B: scan for schedule keywords + time pattern
-const TIME_RE     = /(\d{1,2})[:.h]\d{2}(?:\s*(?:น\.|นาฬิกา|โมง))?/g;
-const SCHEDULE_KW = ['นัด', 'ไป', 'พบ', 'ประชุม', 'งาน', 'เจอ', 'meet', 'schedule', 'appointment'];
+/* stats */
+.hcm-srow { display: flex; gap: 7px; margin-bottom: 8px; }
+.hcm-sc   { flex: 1; background: rgba(255,255,255,.04); border: 1px solid var(--bdr); padding: 7px; text-align: center; }
+.hcm-scv  { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 700; color: var(--pk2); line-height: 1; text-shadow: 0 0 10px rgba(220,130,180,.28); }
+.hcm-scl  { font-size: 7px; color: var(--ik4); text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
 
-function scanPatterns(text, msgId) {
-    // ข้ามถ้ามี CAL tag อยู่แล้ว
-    if (CAL_RE.test(text)) { CAL_RE.lastIndex = 0; return; }
-    CAL_RE.lastIndex = 0;
-    const hasKw = SCHEDULE_KW.some(k => text.includes(k));
-    if (!hasKw) return;
-    const times = [...text.matchAll(TIME_RE)];
-    if (!times.length) return;
-    const t = times[0][0];
-    addEvent({
-        person   : '',
-        date     : dateStr(new Date()),
-        time     : t.replace(/[h\s]/g, ':').replace('น.', '').replace('นาฬิกา', '').trim(),
-        activity : '[auto] ' + text.slice(0, 45).replace(/\n/g, ' '),
-        symbol   : 'general',
-        details  : '',
-    });
+/* code cards */
+.hcm-card { border: 1px solid var(--bdr); overflow: hidden; margin-bottom: 7px; background: rgba(255,255,255,.04); position: relative; }
+.hcm-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(190,130,220,.22), transparent); }
+.hcm-chead { background: rgba(255,255,255,.045); border-bottom: 1px solid var(--bdr); padding: 5px 8px; display: flex; align-items: center; gap: 5px; }
+.hcm-ctag  { background: var(--pk3); color: white; padding: 1px 8px; font-size: 8px; font-weight: 700; flex-shrink: 0; }
+.hcm-cid   { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 10px; color: var(--ik3); flex: 1; }
+.hcm-ib {
+  width: 20px; height: 20px; border: 1px solid var(--bdr);
+  background: rgba(255,255,255,.05); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--ik3);
+  font-family: 'Cormorant Garamond', serif; font-weight: 700;
+  transition: background .1s, color .1s;
 }
-
-function parseAttrs(str) {
-    const a = {};
-    str.split(',').forEach(pair => {
-        const i = pair.indexOf('=');
-        if (i > 0) a[pair.slice(0, i).trim()] = pair.slice(i + 1).trim();
-    });
-    return a;
+.hcm-ib:hover { background: rgba(255,255,255,.12); color: white; }
+.hcm-ib.hcm-del:hover { background: rgba(200,50,50,.2); color: #ff8080; }
+.hcm-cpre {
+  font-family: 'Courier New', monospace; font-size: 8.5px; color: var(--ik2);
+  background: rgba(0,0,0,.22); border: 1px solid var(--bdr);
+  padding: 4px 7px; max-height: 40px; overflow: hidden; position: relative;
+  line-height: 1.5; white-space: pre-wrap; word-break: break-all;
 }
+.hcm-cpre::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 14px; background: linear-gradient(transparent, rgba(12,10,28,.85)); }
+.hcm-cmeta { display: flex; gap: 8px; margin-top: 4px; font-size: 8px; color: var(--ik4); font-family: 'Cormorant Garamond', serif; font-style: italic; }
 
-// ═══ UI PANEL ═════════════════════════════════════════════════
-let currentSection = 'toc';
-let calView = { year: new Date().getFullYear(), month: new Date().getMonth() };
-let selectedDate  = null;
+/* features */
+.hcm-feat { border: 1px solid var(--bdr); padding: 9px 11px; margin-bottom: 7px; display: flex; gap: 9px; align-items: flex-start; background: rgba(255,255,255,.03); }
+.hcm-fn   { width: 18px; height: 18px; border: 1px solid rgba(220,192,120,.28); transform: rotate(45deg); display: flex; align-items: center; justify-content: center; background: rgba(220,192,120,.06); flex-shrink: 0; }
+.hcm-fn span { transform: rotate(-45deg); font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: 8px; color: var(--go2); }
+.hcm-fname { font-size: 11px; font-weight: 600; color: var(--ink); }
+.hcm-fdesc { font-size: 8.5px; color: var(--ik3); margin-top: 2px; line-height: 1.55; }
 
-function createPanel() {
-    if (document.getElementById('hcm-panel')) return;
-
-    // ── Launcher tab (right edge) ──
-    const launcher = document.createElement('div');
-    launcher.id = 'hcm-launcher';
-    launcher.innerHTML = `
-      <div id="hcm-ltab">
-        <div class="hcm-lt-gem"><span>H</span></div>
-        <div class="hcm-lt-lbl">HCM</div>
-        <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>
-      </div>`;
-    launcher.querySelector('#hcm-ltab').addEventListener('click', togglePanel);
-    document.body.appendChild(launcher);
-
-    // ── Panel ──
-    const panel = document.createElement('div');
-    panel.id = 'hcm-panel';
-    panel.innerHTML = buildHTML();
-    document.body.appendChild(panel);
-
-    bindEvents();
-    startClock();
-    refreshAllUI();
+/* buttons */
+.hcm-btns  { display: flex; gap: 7px; margin-top: 6px; }
+.hcm-btnp, .hcm-btns2 {
+  flex: 1; padding: 7px 12px; border: 1px solid transparent; cursor: pointer;
+  font-family: 'Sarabun', sans-serif; font-weight: 600; font-size: 9.5px;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  transition: opacity .12s, background .12s;
 }
+.hcm-btnp  { background: var(--pk3); color: white; border-color: var(--pk4); }
+.hcm-btnp:hover  { opacity: .84; }
+.hcm-btns2 { background: rgba(255,255,255,.06); color: var(--ik2); border-color: var(--bdr); }
+.hcm-btns2:hover { background: rgba(255,255,255,.1); }
 
-// ─── HTML structure ────────────────────────────────────────────
-function buildHTML() {
-    return `
-<div class="hcm-frame">
-  <div class="hcm-rings">${Array(9).fill('<div class="hcm-ring"></div>').join('')}</div>
-  <div class="hcm-bmarks">
-    <div class="hcm-bm" data-bm="code">โค้ด</div>
-    <div class="hcm-bm" data-bm="cal">ปฏิทิน</div>
-    <div class="hcm-bm" data-bm="toc">เมนู</div>
-  </div>
-  <div class="hcm-book">
-    <div class="hcm-band hcm-top"></div>
-
-    <div class="hcm-sb">
-      <div class="hcm-sb-l">
-        <div class="hcm-sb-dot"></div>
-        <span id="hcm-clock">--:--:--</span>
-        <span class="hcm-sep">·</span>
-        <span id="hcm-chatname">SillyTavern</span>
-      </div>
-      <div class="hcm-sb-r" id="hcm-charname">—</div>
-    </div>
-
-    <div class="hcm-hd">
-      <div class="hcm-hdm">
-        <span class="hcm-eyebrow" id="hcm-eyebrow">HCM Diary</span>
-        <div class="hcm-title" id="hcm-title">สารบัญระบบ</div>
-        <div class="hcm-sub" id="hcm-sub">ส่วนขยาย SillyTavern</div>
-      </div>
-      <div class="hcm-hdbtns">
-        <div class="hcm-hdbtn" id="hcm-back" style="display:none">&#8592;</div>
-        <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
-      </div>
-    </div>
-
-    <div class="hcm-drow">
-      <span class="hcm-dlbl">Date</span>
-      <div class="hcm-dval" id="hcm-date">—</div>
-    </div>
-
-    <div class="hcm-stabs" id="hcm-tabs-code">
-      <div class="hcm-stab hcm-on" data-sv="code">โค้ด <span class="hcm-tbadge" id="hcm-cnt">0</span></div>
-      <div class="hcm-stab" data-sv="settings">ตั้งค่า</div>
-    </div>
-    <div class="hcm-stabs" id="hcm-tabs-cal">
-      <div class="hcm-stab hcm-on" data-cv="month">เดือน</div>
-      <div class="hcm-stab" data-cv="list">รายการ</div>
-      <div class="hcm-stab" data-cv="add">+ เพิ่ม</div>
-    </div>
-
-    <div class="hcm-body">
-      ${buildTOC()}
-      ${buildCode()}
-      ${buildCalendar()}
-    </div>
-
-    <div class="hcm-band hcm-bot"></div>
-    <div class="hcm-hind"><div class="hcm-hbar"></div></div>
-  </div>
-</div>
-
-<div id="hcm-pop">
-  <div class="hcm-ps">
-    <div class="hcm-ph">
-      <span class="hcm-pt" id="hcm-pt">—</span>
-      <button class="hcm-pc" id="hcm-pc-btn">คัดลอก</button>
-      <div class="hcm-px" id="hcm-pop-close">&#215;</div>
-    </div>
-    <div class="hcm-ptb">
-      <div class="hcm-ptt hcm-on" data-pt="src">ซอร์สโค้ด</div>
-      <div class="hcm-ptt" data-pt="prev">พรีวิว</div>
-    </div>
-    <div class="hcm-pb">
-      <div id="hcm-ptsrc"><pre id="hcm-psrc"></pre></div>
-      <div id="hcm-ptprev" style="display:none"><div id="hcm-pprev"></div></div>
-    </div>
-  </div>
-</div>`;
+/* inputs */
+.hcm-fg { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.hcm-fl { font-family: 'Cormorant Garamond', serif; font-size: 12px; font-weight: 600; font-style: italic; color: var(--pk2); }
+.hcm-input, #hcm-panel input, #hcm-panel select {
+  background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  padding: 6px 9px; font-family: 'Sarabun', sans-serif; font-size: 9.5px;
+  color: var(--ink); outline: none; width: 100%; transition: border-color .12s;
 }
-
-function buildTOC() {
-    return `
-<div class="hcm-view hcm-on" id="hcm-v-toc">
-  <div class="hcm-toc-hd">
-    <span class="hcm-toc-lbl">NOTE</span>
-    <span class="hcm-toc-yr">ระบบ &amp; เครื่องมือ</span>
-  </div>
-  <div class="hcm-trow hcm-can" data-nav="code">
-    <div class="hcm-tl"><div class="hcm-tbig">C</div><div class="hcm-tabb">CODE</div></div>
-    <div class="hcm-tm">
-      <div class="hcm-tnum">ระบบที่ 01</div>
-      <div class="hcm-tname">ตัวจัดการโค้ด</div>
-      <div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div>
-    </div>
-    <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div>
-    <div class="hcm-tarrow">&#8250;</div>
-  </div>
-  <div class="hcm-trow hcm-locked">
-    <div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div>
-    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
-    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
-  </div>
-  <div class="hcm-trow hcm-locked">
-    <div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div>
-    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
-    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
-  </div>
-  <div class="hcm-trow hcm-locked" style="border-bottom:none">
-    <div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div>
-    <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
-    <div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div>
-  </div>
-  <div class="hcm-note-card">
-    <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
-    <div class="hcm-nc-body">
-      AI ใส่ tag ในบทโรล → extension จับ → ลบออก → บันทึก → inject ก่อนโรลถัดไป<br><br>
-      <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
-      symbols: heart · star · diamond · note · cross · task · general
-    </div>
-  </div>
-</div>`;
+.hcm-input:focus, #hcm-panel input:focus, #hcm-panel select:focus {
+  border-color: rgba(200,140,200,.38);
 }
+#hcm-panel input::placeholder { color: var(--ik4); }
+#hcm-panel select option { background: #140f2c; color: var(--ink); }
 
-function buildCode() {
-    return `
-<div class="hcm-view" id="hcm-v-code">
-  <div class="hcm-sv hcm-on" id="hcm-sv-code">
-    <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
-    <div class="hcm-srow">
-      <div class="hcm-sc"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
-      <div class="hcm-sc"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
-    </div>
-    <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
-    <div id="hcm-codelist"></div>
-    <div class="hcm-btns">
-      <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
-      <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export JSON</button>
-    </div>
-  </div>
-  <div class="hcm-sv" id="hcm-sv-settings" style="display:none">
-    <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
-    <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ใน context ด้วย &lt;codeN&gt;</div></div></div>
-    <div class="hcm-feat"><div class="hcm-fn"><span>II</span></div><div><div class="hcm-fname">ประหยัด token</div><div class="hcm-fdesc">~450 token → ~12 token ต่อบล็อก</div></div></div>
-    <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
-    <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">ส่งกำหนดการเข้า context ก่อนโรลทุกครั้ง</div></div></div>
-  </div>
-</div>`;
+/* ─── Calendar ───────────────────────────────────────────────── */
+.hcm-cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 15px 6px 11px; border-bottom: 1px solid var(--bdr);
+  background: rgba(255,255,255,.022);
 }
-
-function buildCalendar() {
-    const symOpts = Object.entries(SYMBOL_MAP)
-        .map(([k, v]) => `<option value="${k}">${v.c} ${v.label}</option>`).join('');
-    return `
-<div class="hcm-view" id="hcm-v-cal">
-  <div class="hcm-sv hcm-on hcm-cal-full" id="hcm-calv-month">
-    <div class="hcm-cal-nav">
-      <button class="hcm-cal-nb" id="hcm-cal-prev">&#8249;</button>
-      <div class="hcm-cal-lbl" id="hcm-cal-lbl">—</div>
-      <button class="hcm-cal-nb" id="hcm-cal-next">&#8250;</button>
-    </div>
-    <div class="hcm-cal-pf">
-      <span class="hcm-cal-pfl">บุคคล</span>
-      <select class="hcm-psel" id="hcm-pfilter"><option value="">ทุกคน</option></select>
-    </div>
-    <div class="hcm-cal-dows">
-      <div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div>
-      <div>พฤ.</div><div>ศ.</div><div>ส.</div>
-    </div>
-    <div class="hcm-cal-grid" id="hcm-cal-grid"></div>
-    <div class="hcm-cal-leg" id="hcm-cal-leg"></div>
-    <div class="hcm-cal-det" id="hcm-cal-det" style="display:none"></div>
-  </div>
-
-  <div class="hcm-sv" id="hcm-calv-list" style="display:none">
-    <div class="hcm-dvd" style="margin:0 0 8px"><div class="hcm-dvdg"></div><div class="hcm-dvdt">กำหนดการทั้งหมด</div></div>
-    <div id="hcm-ev-list"></div>
-  </div>
-
-  <div class="hcm-sv" id="hcm-calv-add" style="display:none">
-    <div class="hcm-dvd" style="margin:0 0 8px"><div class="hcm-dvdg"></div><div class="hcm-dvdt">เพิ่มกำหนดการ</div></div>
-    <div class="hcm-fg"><div class="hcm-fl">บุคคล</div><input type="text" id="hcm-a-person" placeholder="ชื่อตัวละคร" class="hcm-input"></div>
-    <div class="hcm-fg"><div class="hcm-fl">วันที่</div><input type="date" id="hcm-a-date" class="hcm-input"></div>
-    <div class="hcm-fg"><div class="hcm-fl">เวลา</div><input type="time" id="hcm-a-time" class="hcm-input"></div>
-    <div class="hcm-fg"><div class="hcm-fl">กิจกรรม</div><input type="text" id="hcm-a-act" placeholder="รายละเอียดกิจกรรม" class="hcm-input"></div>
-    <div class="hcm-fg"><div class="hcm-fl">สัญลักษณ์</div><select id="hcm-a-sym" class="hcm-input">${symOpts}</select></div>
-    <div class="hcm-fg"><div class="hcm-fl">รายละเอียด</div><input type="text" id="hcm-a-detail" placeholder="โน้ตเพิ่มเติม" class="hcm-input"></div>
-    <button class="hcm-btnp" id="hcm-add-save">&#43; บันทึก</button>
-  </div>
-</div>`;
+.hcm-cal-nb {
+  width: 24px; height: 24px; border: 1px solid var(--bdr);
+  background: rgba(255,255,255,.05); cursor: pointer;
+  font-family: 'Cormorant Garamond', serif; font-size: 16px; font-weight: 700;
+  color: var(--pk2); display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
 }
-
-// ═══ EVENT BINDING ════════════════════════════════════════════
-function bindEvents() {
-    // Close / back
-    document.getElementById('hcm-close').addEventListener('click', () => togglePanel());
-    document.getElementById('hcm-back' ).addEventListener('click', navBack);
-
-    // Bookmark navigation
-    document.querySelectorAll('.hcm-bm').forEach(bm => {
-        bm.addEventListener('click', () => {
-            const target = bm.dataset.bm;
-            if (!panelOpen()) openPanel();
-            if (target === 'toc') navBack();
-            else openSection(target);
-        });
-    });
-
-    // TOC row click
-    document.querySelectorAll('.hcm-trow.hcm-can').forEach(row => {
-        row.addEventListener('click', () => openSection(row.dataset.nav));
-                        });
-
-    // Code sub-tabs
-    document.querySelectorAll('#hcm-tabs-code .hcm-stab').forEach(t =>
-        t.addEventListener('click', () => switchSub('code', t.dataset.sv))
-    );
-
-    // Cal sub-tabs
-    document.querySelectorAll('#hcm-tabs-cal .hcm-stab').forEach(t =>
-        t.addEventListener('click', () => {
-            switchSub('cal', t.dataset.cv);
-            if (t.dataset.cv === 'month') renderCalGrid();
-            if (t.dataset.cv === 'list')  renderCalList();
-        })
-    );
-
-    // Calendar nav
-    document.getElementById('hcm-cal-prev').addEventListener('click', () => {
-        calView.month--;
-        if (calView.month < 0) { calView.month = 11; calView.year--; }
-        renderCalGrid();
-    });
-    document.getElementById('hcm-cal-next').addEventListener('click', () => {
-        calView.month++;
-        if (calView.month > 11) { calView.month = 0; calView.year++; }
-        renderCalGrid();
-    });
-    document.getElementById('hcm-pfilter').addEventListener('change', renderCalGrid);
-
-    // Code buttons
-    document.getElementById('hcm-clear-btn' ).addEventListener('click', () => {
-        codeData().blocks = [];
-        saveSettingsDebounced();
-        refreshCodeUI();
-    });
-    document.getElementById('hcm-export-btn').addEventListener('click', exportJSON);
-
-    // Add event form
-    document.getElementById('hcm-add-save').addEventListener('click', saveManualEvent);
-    document.getElementById('hcm-a-date').value = dateStr(new Date());
-
-    // Popup close
-    document.getElementById('hcm-pop-close').addEventListener('click', closePop);
-    document.getElementById('hcm-pop').addEventListener('click', e => {
-        if (e.target.id === 'hcm-pop') closePop();
-    });
-
-    // Popup copy
-    document.getElementById('hcm-pc-btn').addEventListener('click', () => {
-        const b = codeData().blocks.find(x => x.id === currentPopId);
-        if (!b) return;
-        navigator.clipboard.writeText(b.html).catch(() => {});
-        const btn = document.getElementById('hcm-pc-btn');
-        btn.textContent = 'คัดลอกแล้ว';
-        setTimeout(() => btn.textContent = 'คัดลอก', 1400);
-    });
-
-    // Popup tabs
-    document.querySelectorAll('.hcm-ptt').forEach(t => t.addEventListener('click', () => {
-        document.querySelectorAll('.hcm-ptt').forEach(x => x.classList.remove('hcm-on'));
-        t.classList.add('hcm-on');
-        document.getElementById('hcm-ptsrc' ).style.display = t.dataset.pt === 'src'  ? 'block' : 'none';
-        document.getElementById('hcm-ptprev').style.display = t.dataset.pt === 'prev' ? 'block' : 'none';
-    }));
+.hcm-cal-nb:hover { background: rgba(255,255,255,.1); }
+.hcm-cal-lbl {
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 15px; font-weight: 700; color: white;
+  text-shadow: 0 0 14px rgba(190,130,220,.3);
 }
-
-// ═══ NAVIGATION ═══════════════════════════════════════════════
-function panelOpen() {
-    const p = document.getElementById('hcm-panel');
-    return p && p.classList.contains('hcm-open');
+.hcm-cal-pf {
+  display: flex; align-items: center; gap: 8px; padding: 5px 15px 5px 11px;
+  border-bottom: 1px solid var(--bdr); background: rgba(255,255,255,.015);
 }
-function openPanel() {
-    document.getElementById('hcm-panel').classList.add('hcm-open');
+.hcm-cal-pfl { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 11px; color: var(--lv2); }
+.hcm-psel { font-size: 9px; flex: 1; }
+.hcm-cal-dows {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  background: rgba(120,70,180,.12); border-bottom: 1px solid var(--bdr);
 }
-function togglePanel() {
-    document.getElementById('hcm-panel').classList.toggle('hcm-open');
+.hcm-cal-dows > div {
+  text-align: center; padding: 4px 0;
+  font-family: 'Cormorant Garamond', serif; font-style: italic;
+  font-size: 9.5px; font-weight: 600; color: var(--lv2);
 }
-
-function setActiveBm(section) {
-    document.querySelectorAll('.hcm-bm').forEach(bm => {
-        bm.classList.toggle('hcm-active', bm.dataset.bm === section);
-    });
+.hcm-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  padding: 4px 6px; gap: 2px;
+  background:
+    radial-gradient(ellipse 90% 70% at 20% 35%, rgba(180,90,230,.18), transparent 65%),
+    radial-gradient(ellipse 70% 65% at 80% 70%, rgba(90,130,240,.16), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 55% 15%, rgba(230,110,160,.14), transparent 60%),
+    rgba(30,18,58,.45);
 }
-
-function openSection(s) {
-    currentSection = s;
-    ['toc', 'code', 'cal'].forEach(v => {
-        const el = document.getElementById(`hcm-v-${v}`);
-        if (el) el.style.display = 'none';
-    });
-    document.getElementById('hcm-tabs-code').style.display = 'none';
-    document.getElementById('hcm-tabs-cal' ).style.display = 'none';
-    document.getElementById('hcm-back').style.display = 'flex';
-    setActiveBm(s);
-
-    if (s === 'code') {
-        const vCode = document.getElementById('hcm-v-code');
-        vCode.style.display = 'flex';
-        document.getElementById('hcm-tabs-code').style.display = 'flex';
-        // ensure first sub-view visible
-        const svCode = document.getElementById('hcm-sv-code');
-        if (svCode) svCode.style.display = 'flex';
-        setHeader('ระบบที่ 01', 'ตัวจัดการโค้ด', 'HTML Block Store');
-        refreshCodeUI();
-    } else {
-        const vCal = document.getElementById('hcm-v-cal');
-        vCal.style.display = 'flex';
-        document.getElementById('hcm-tabs-cal').style.display = 'flex';
-        // ensure first sub-view visible
-        const svMonth = document.getElementById('hcm-calv-month');
-        if (svMonth) svMonth.style.display = 'flex';
-        setHeader('ระบบที่ 02', 'ปฏิทินตัวละคร', 'กิจกรรมในโรล');
-        buildPersonFilter();
-        renderCalGrid();
-        renderCalList();
-    }
+.hcm-cal-day {
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-start; padding: 2px; cursor: pointer; min-width: 0;
+  border: 1px solid transparent; border-radius: 2px;
+  transition: background .1s, border-color .1s;
 }
-
-function navBack() {
-    currentSection = 'toc';
-    ['code', 'cal'].forEach(v => {
-        const el = document.getElementById(`hcm-v-${v}`);
-        if (el) el.style.display = 'none';
-    });
-    document.getElementById('hcm-v-toc').style.display       = 'flex';
-    document.getElementById('hcm-tabs-code').style.display   = 'none';
-    document.getElementById('hcm-tabs-cal' ).style.display   = 'none';
-    document.getElementById('hcm-back').style.display        = 'none';
-    setHeader('HCM Diary', 'สารบัญระบบ', 'ส่วนขยาย SillyTavern');
-    setActiveBm('toc');
+.hcm-cal-day.hcm-emp { cursor: default; }
+.hcm-cal-day:not(.hcm-emp):hover { background: rgba(180,130,240,.12); border-color: rgba(180,130,240,.22); }
+.hcm-cal-day.hcm-tdy { background: rgba(200,90,160,.2); border-color: rgba(220,120,180,.38); }
+.hcm-cal-day.hcm-sel { border-color: rgba(220,192,120,.5) !important; background: rgba(220,192,120,.1); }
+.hcm-dn { font-family: 'Cormorant Garamond', serif; font-size: 11px; font-weight: 600; color: var(--ik2); line-height: 1; }
+.hcm-cal-day.hcm-tdy .hcm-dn { color: var(--pk2); font-weight: 700; }
+.hcm-cal-syms { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 1px; }
+.hcm-sym { font-size: 7.5px; line-height: 1.2; }
+.hcm-cal-leg {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 5px 11px;
+  border-top: 1px solid var(--bdr); background: rgba(100,60,160,.1);
 }
-
-function switchSub(section, name) {
-    const tabsId = section === 'code' ? 'hcm-tabs-code' : 'hcm-tabs-cal';
-    const prefix = section === 'code' ? 'hcm-sv-' : 'hcm-calv-';
-    const attr   = section === 'code' ? 'sv' : 'cv';
-
-    document.querySelectorAll(`#${tabsId} .hcm-stab`).forEach(x => x.classList.remove('hcm-on'));
-    const t = document.querySelector(`#${tabsId} .hcm-stab[data-${attr}="${name}"]`);
-    if (t) t.classList.add('hcm-on');
-
-    // hide all sub-views in that section
-    const parent = document.getElementById(`hcm-v-${section === 'code' ? 'code' : 'cal'}`);
-    parent.querySelectorAll('.hcm-sv').forEach(sv => sv.style.display = 'none');
-
-    const target = document.getElementById(prefix + name);
-    if (target) target.style.display = 'flex';
+.hcm-leg-it { display: flex; align-items: center; gap: 3px; font-size: 8px; color: var(--ik3); }
+.hcm-leg-it .hcm-sym { font-size: 9px; }
+.hcm-cal-det { border-top: 1px solid var(--bdr); max-height: 180px; overflow-y: auto; background: rgba(20,10,44,.5); }
+.hcm-det-hd  { display: flex; align-items: center; justify-content: space-between; padding: 6px 11px 5px; border-bottom: 1px solid var(--bdr); background: rgba(255,255,255,.04); }
+.hcm-det-date{ font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 12px; font-weight: 700; color: var(--pk2); }
+.hcm-det-cnt { font-size: 8px; color: var(--ik4); }
+.hcm-det-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 11px; border-bottom: 1px solid var(--bdr); }
+.hcm-det-row:last-child { border-bottom: none; }
+.hcm-det-sym { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.hcm-det-body{ flex: 1; }
+.hcm-det-act { font-size: 11px; font-weight: 600; color: var(--ink); }
+.hcm-det-meta{ display: flex; gap: 8px; font-size: 8.5px; color: var(--ik3); margin-top: 2px; font-family: 'Cormorant Garamond', serif; font-style: italic; }
+.hcm-det-note{ font-size: 8.5px; color: var(--ik3); margin-top: 3px; border-left: 2px solid var(--pk3); padding-left: 6px; }
+.hcm-det-del, .hcm-lev-del {
+  cursor: pointer; color: var(--ik4); font-size: 14px;
+  width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  font-family: 'Cormorant Garamond', serif; font-weight: 700; transition: color .12s;
+  flex-shrink: 0;
 }
+.hcm-det-del:hover, .hcm-lev-del:hover { color: #ff7070; }
+.hcm-list-ev { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--bdr); }
+.hcm-list-ev.hcm-past { opacity: .42; }
+.hcm-list-ev:last-child { border-bottom: none; }
+.hcm-lev-sym  { font-size: 18px; flex-shrink: 0; }
+.hcm-lev-body { flex: 1; }
+.hcm-lev-act  { font-size: 11px; font-weight: 600; color: var(--ink); }
+.hcm-lev-meta { font-size: 8.5px; color: var(--ik4); margin-top: 2px; font-family: 'Cormorant Garamond', serif; font-style: italic; }
+.hcm-lev-det  { font-size: 8.5px; color: var(--ik3); margin-top: 2px; border-left: 2px solid var(--pk3); padding-left: 5px; }
 
-// ═══ CALENDAR UI ══════════════════════════════════════════════
-const TH_MONTH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const TH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.',
-                  'ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+.hcm-empty    { text-align: center; padding: 22px 10px; }
+.hcm-empty p  { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 12px; color: var(--ik4); }
 
-function renderCalGrid() {
-    const { year, month } = calView;
-    document.getElementById('hcm-cal-lbl').textContent = `${TH_MONTH[month]} ${year + 543}`;
-    const pf      = document.getElementById('hcm-pfilter').value;
-    const events  = calData().events.filter(e => !pf || e.person === pf);
-    const first   = new Date(year, month, 1).getDay();
-    const last    = new Date(year, month + 1, 0).getDate();
-    const todayS  = dateStr(new Date());
-    const grid    = document.getElementById('hcm-cal-grid');
-    grid.innerHTML = '';
+/* home indicator */
+.hcm-hind { padding: 4px 0 7px; display: flex; align-items: center; justify-content: center; border-top: 1px solid var(--bdr); position: relative; }
+.hcm-hind::before { content: ''; position: absolute; top: 0; left: 18%; right: 18%; height: 1px; background: linear-gradient(90deg, transparent, var(--god), transparent); }
+.hcm-hbar { width: 58px; height: 3px; background: rgba(190,140,200,.18); border-radius: 2px; }
 
-    for (let i = 0; i < first; i++) {
-        const c = document.createElement('div');
-        c.className = 'hcm-cal-day hcm-emp'; grid.appendChild(c);
-    }
-    for (let d = 1; d <= last; d++) {
-        const ds = `${year}-${pad(month + 1)}-${pad(d)}`;
-        const de = events.filter(e => e.date === ds);
-        const cell = document.createElement('div');
-        cell.className = 'hcm-cal-day'
-            + (ds === todayS    ? ' hcm-tdy' : '')
-            + (ds === selectedDate ? ' hcm-sel' : '');
-        cell.innerHTML = `<div class="hcm-dn">${d}</div>`;
-        if (de.length) {
-            const syms = document.createElement('div');
-            syms.className = 'hcm-cal-syms';
-            de.slice(0, 3).forEach(ev => {
-                const sym = SYMBOL_MAP[ev.symbol] || SYMBOL_MAP.general;
-                const sp  = document.createElement('span');
-                sp.className = 'hcm-sym';
-                sp.style.color = sym.color;
-                sp.textContent = sym.c;
-                syms.appendChild(sp);
-            });
-            cell.appendChild(syms);
-        }
-        cell.addEventListener('click', () => showDayDetail(ds, de));
-        grid.appendChild(cell);
-    }
-    renderLegend();
+/* ─── Inline block (ใน chat messages) ──────────────────────── */
+.hcm-inline-block {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(26,20,52,.75); backdrop-filter: blur(8px);
+  border: 1px solid rgba(200,140,200,.25); border-radius: 2px;
+  padding: 6px 11px; margin: 4px 0; cursor: pointer;
 }
-
-function renderLegend() {
-    document.getElementById('hcm-cal-leg').innerHTML =
-        Object.entries(SYMBOL_MAP).map(([, v]) =>
-            `<div class="hcm-leg-it"><span class="hcm-sym" style="color:${v.color}">${v.c}</span><span>${v.label}</span></div>`
-        ).join('');
+.hcm-inline-tag  { font-weight: 700; font-size: 11px; color: #f0b0cc; }
+.hcm-inline-meta { font-size: 9px; color: rgba(255,255,255,.4); font-style: italic; }
+.hcm-inline-prev {
+  background: #c96090; color: white; border: none; padding: 2px 9px;
+  font-size: 9px; font-weight: 600; cursor: pointer; transition: opacity .12s;
 }
+.hcm-inline-prev:hover { opacity: .84; }
 
-function showDayDetail(ds, events) {
-    selectedDate = ds;
-    renderCalGrid();
-    const det = document.getElementById('hcm-cal-det');
-    if (!events.length) { det.style.display = 'none'; return; }
-    det.style.display = 'block';
-    const [y, m, d] = ds.split('-');
-    const lbl = `${parseInt(d)} ${TH_SHORT[parseInt(m) - 1]} ${parseInt(y) + 543}`;
-    det.innerHTML = `
-      <div class="hcm-det-hd">
-        <div class="hcm-det-date">${lbl}</div>
-        <div class="hcm-det-cnt">${events.length} กิจกรรม</div>
-      </div>
-      ${events.map(ev => {
-          const sym = SYMBOL_MAP[ev.symbol] || SYMBOL_MAP.general;
-          return `<div class="hcm-det-row">
-            <div class="hcm-det-sym" style="color:${sym.color}">${sym.c}</div>
-            <div class="hcm-det-body">
-              <div class="hcm-det-act">${ev.activity}</div>
-              <div class="hcm-det-meta">
-                <span>${ev.person || 'ทุกคน'}</span>
-                <span>${ev.time || '--:--'}</span>
-              </div>
-              ${ev.details ? `<div class="hcm-det-note">${ev.details}</div>` : ''}
-            </div>
-            <div class="hcm-det-del" data-evid="${ev.id}">&#215;</div>
-          </div>`;
-      }).join('')}`;
-
-    // bind delete buttons
-    det.querySelectorAll('.hcm-det-del').forEach(btn => {
-        btn.addEventListener('click', () => {
-            removeEvent(parseFloat(btn.dataset.evid));
-            det.style.display = 'none';
-            selectedDate = null;
-        });
-    });
+/* ─── Popup ─────────────────────────────────────────────────── */
+#hcm-pop {
+  position: fixed; inset: 0; z-index: 9950;
+  background: rgba(6,4,16,.75); backdrop-filter: blur(12px);
+  display: none; align-items: center; justify-content: center;
 }
-
-function renderCalList() {
-    const el = document.getElementById('hcm-ev-list');
-    if (!el) return;
-    const sorted  = [...calData().events].sort((a, b) =>
-        (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`)
-    );
-    const todayS  = dateStr(new Date());
-    if (!sorted.length) {
-        el.innerHTML = '<div class="hcm-empty"><p>ยังไม่มีกำหนดการ</p></div>';
-        return;
-    }
-    el.innerHTML = sorted.map(ev => {
-        const sym = SYMBOL_MAP[ev.symbol] || SYMBOL_MAP.general;
-        return `<div class="hcm-list-ev${ev.date < todayS ? ' hcm-past' : ''}">
-          <div class="hcm-lev-sym" style="color:${sym.color}">${sym.c}</div>
-          <div class="hcm-lev-body">
-            <div class="hcm-lev-act">${ev.activity}</div>
-            <div class="hcm-lev-meta">${ev.date} ${ev.time} · ${ev.person || 'ทุกคน'}</div>
-            ${ev.details ? `<div class="hcm-lev-det">${ev.details}</div>` : ''}
-          </div>
-          <div class="hcm-lev-del" data-evid="${ev.id}">&#215;</div>
-        </div>`;
-    }).join('');
-
-    el.querySelectorAll('.hcm-lev-del').forEach(btn => {
-        btn.addEventListener('click', () => removeEvent(parseFloat(btn.dataset.evid)));
-    });
+#hcm-pop.hcm-on { display: flex; }
+.hcm-ps {
+  background: rgba(16,12,34,.9);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 0 0 1px rgba(190,130,220,.1), 0 24px 64px rgba(0,0,0,.65);
+  width: min(440px, 92vw); max-height: 74vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: hcmPi .22s ease;
 }
-
-function buildPersonFilter() {
-    const sel = document.getElementById('hcm-pfilter');
-    if (!sel) return;
-    const cur     = sel.value;
-    const persons = [...new Set(calData().events.map(e => e.person).filter(Boolean))];
-    sel.innerHTML = '<option value="">ทุกคน</option>' +
-        persons.map(p => `<option value="${p}">${p}</option>`).join('');
-    sel.value = cur;
+@keyframes hcmPi { from { transform: scale(.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.hcm-ph { background: rgba(255,255,255,.04); border-bottom: 1px solid var(--bdr); padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+.hcm-pt { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 13px; color: var(--ink); flex: 1; font-weight: 600; }
+.hcm-pc { background: var(--pk3); color: white; border: none; padding: 3.5px 10px; font-size: 8.5px; font-weight: 600; cursor: pointer; transition: opacity .12s; }
+.hcm-pc:hover { opacity: .84; }
+.hcm-px { width: 22px; height: 22px; border: 1px solid var(--bdr); background: rgba(255,255,255,.05); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ik3); font-family: 'Cormorant Garamond', serif; font-weight: 700; transition: background .12s; }
+.hcm-px:hover { background: rgba(255,255,255,.12); color: white; }
+.hcm-ptb { display: flex; background: rgba(255,255,255,.022); border-bottom: 1px solid var(--bdr); padding: 0 12px; }
+.hcm-ptt { padding: 6px 11px 5px; font-size: 9.5px; font-weight: 600; color: var(--ik3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s, border-color .12s; }
+.hcm-ptt.hcm-on { color: var(--pk2); border-bottom-color: var(--pk3); }
+.hcm-pb { flex: 1; overflow-y: auto; padding: 12px; }
+#hcm-psrc {
+  background: rgba(0,0,0,.28); border: 1px solid var(--bdr);
+  padding: 10px 12px; font-family: 'Courier New', monospace;
+  font-size: 9.5px; color: var(--ink); overflow-x: auto;
+  white-space: pre-wrap; word-break: break-all; line-height: 1.6;
 }
-
-function saveManualEvent() {
-    const act = document.getElementById('hcm-a-act').value.trim();
-    if (!act) return;
-    addEvent({
-        person   : document.getElementById('hcm-a-person').value.trim(),
-        date     : document.getElementById('hcm-a-date').value   || dateStr(new Date()),
-        time     : document.getElementById('hcm-a-time').value,
-        activity : act,
-        symbol   : document.getElementById('hcm-a-sym').value,
-        details  : document.getElementById('hcm-a-detail').value.trim(),
-    });
-    document.getElementById('hcm-a-act').value    = '';
-    document.getElementById('hcm-a-detail').value = '';
-    switchSub('cal', 'list');
-    renderCalList();
-}
-
-function refreshCalUI() {
-    if (currentSection !== 'cal') return;
-    renderCalGrid();
-    renderCalList();
-    buildPersonFilter();
-}
-
-// ═══ CODE UI ══════════════════════════════════════════════════
-function refreshCodeUI() {
-    const blocks = codeData().blocks;
-    const total  = blocks.length;
-    const tok    = blocks.reduce((a, b) => a + b.tokens, 0);
-    setElText('hcm-total', total);
-    setElText('hcm-tok',   '~' + tok);
-    setElText('hcm-cnt',   total);
-    updateBadge();
-
-    const list = document.getElementById('hcm-codelist');
-    if (!list) return;
-    if (!total) {
-        list.innerHTML = '<div class="hcm-empty"><p>ยังไม่มีบล็อก</p></div>';
-        return;
-    }
-    list.innerHTML = blocks.map(b => `
-      <div class="hcm-card">
-        <div class="hcm-chead">
-          <span class="hcm-ctag">&lt;code${b.id}&gt;</span>
-          <span class="hcm-cid">#${b.id} · ${b.ts}</span>
-          <div style="display:flex;gap:2px">
-            <div class="hcm-ib" data-action="preview" data-id="${b.id}">&#9675;</div>
-            <div class="hcm-ib" data-action="copy"    data-id="${b.id}">&#9632;</div>
-            <div class="hcm-ib hcm-del" data-action="delete" data-id="${b.id}">&#215;</div>
-          </div>
-        </div>
-        <div style="padding:5px 8px 7px">
-          <div class="hcm-cpre">${escHTML(b.html)}</div>
-          <div class="hcm-cmeta"><span>~${b.tokens} token</span><span>msg#${b.msgId ?? '—'}</span></div>
-        </div>
-      </div>`).join('');
-
-    list.querySelectorAll('.hcm-ib').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = parseInt(btn.dataset.id);
-            if (btn.dataset.action === 'preview') openPop(id);
-            if (btn.dataset.action === 'copy')    copyBlock(id, btn);
-            if (btn.dataset.action === 'delete')  { removeBlock(id); }
-        });
-    });
-}
-
-let currentPopId = null;
-function openPop(id) {
-    const b = codeData().blocks.find(x => x.id === id);
-    if (!b) return;
-    currentPopId = id;
-    setElText('hcm-pt', `code${b.id} · ~${b.tokens} token`);
-    document.getElementById('hcm-psrc').textContent  = b.html;
-    document.getElementById('hcm-pprev').innerHTML   = b.html;
-    // reset to src tab
-    document.querySelectorAll('.hcm-ptt').forEach(t => t.classList.remove('hcm-on'));
-    document.querySelector('[data-pt="src"]').classList.add('hcm-on');
-    document.getElementById('hcm-ptsrc' ).style.display = 'block';
-    document.getElementById('hcm-ptprev').style.display = 'none';
-    document.getElementById('hcm-pop').classList.add('hcm-on');
-}
-function closePop() {
-    document.getElementById('hcm-pop').classList.remove('hcm-on');
-}
-
-function copyBlock(id, btn) {
-    const b = codeData().blocks.find(x => x.id === id);
-    if (!b) return;
-    navigator.clipboard.writeText(b.html).catch(() => {});
-    btn.innerHTML = '&#10003;';
-    setTimeout(() => btn.innerHTML = '&#9632;', 1200);
-}
-
-function exportJSON() {
-    const data = { chatId: getChatId(), calendar: calData(), code: codeData() };
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    a.download = `hcm-${getChatId()}.json`;
-    a.click();
-}
-
-// ═══ CLOCK & LABELS ═══════════════════════════════════════════
-function startClock() {
-    function tick() {
-        const n = new Date();
-        setElText('hcm-clock', n.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        setElText('hcm-date',  n.toLocaleDateString('th-TH', { month: 'short', day: 'numeric', year: 'numeric' }));
-    }
-    tick();
-    setInterval(tick, 1000);
-}
-
-function updateChatLabel() {
-    try {
-        const ctx = getContext();
-        setElText('hcm-chatname', ctx.name2 || ctx.chatId || 'SillyTavern');
-        setElText('hcm-charname', ctx.name2 || '—');
-    } catch {}
-}
-
-function updateBadge() {
-    const n = codeData().blocks.length;
-    setElText('hcm-bdg-n', n);
-    setElText('hcm-cnt',   n);
-}
-
-// ═══ UTILITIES ════════════════════════════════════════════════
-function setHeader(eyebrow, title, sub) {
-    setElText('hcm-eyebrow', eyebrow);
-    setElText('hcm-title',   title);
-    setElText('hcm-sub',     sub);
-}
-function setElText(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-}
-function dateStr(d) {
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function pad(n) { return String(n).padStart(2, '0'); }
-function escHTML(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function refreshAllUI() {
-    refreshCodeUI();
-    updateChatLabel();
-    if (currentSection === 'cal') {
-        renderCalGrid(); renderCalList(); buildPersonFilter();
-    }
-}
-
-// ═══ ST EVENT HOOKS ═══════════════════════════════════════════
-function registerHooks() {
-    const es = window.eventSource;
-    const et = window.event_types;
-    if (!es || !et) {
-        console.warn('[HCM] eventSource/event_types not available — hooks skipped');
-        return;
-    }
-
-    es.on(et.MESSAGE_RECEIVED, (msgId) => {
-        processMessage(msgId);
-    });
-
-    es.on(et.MESSAGE_RENDERED, (msgId) => {
-        renderCodeMarkers(msgId);
-    });
-
-    es.on(et.CHAT_CHANGED, () => {
-        globalCounter = 0;
-        updateInjection();
-        refreshAllUI();
-    });
-}
-
-// แสดง code marker card ใน DOM (ไม่แก้ไข context)
-function renderCodeMarkers(msgId) {
-    const blocks = codeData().blocks.filter(b => b.msgId === msgId);
-    if (!blocks.length) return;
-    const el = document.querySelector(`[mesid="${msgId}"] .mes_text`);
-    if (!el) return;
-    blocks.forEach(b => {
-        const tag  = `<code${b.id}></code${b.id}>`;
-        const card = `<div class="hcm-inline-block" data-bid="${b.id}">
-          <span class="hcm-inline-tag">HTML Block ${b.id}</span>
-          <span class="hcm-inline-meta">${b.tokens} token</span>
-          <button class="hcm-inline-prev" onclick="hcmOpenPop(${b.id})">Preview</button>
-        </div>`;
-        el.innerHTML = el.innerHTML.replace(tag, card);
-    });
-}
-
-// global popup opener สำหรับ inline button
-window.hcmOpenPop = function(id) {
-    if (!panelOpen()) openPanel();
-    openSection('code');
-    openPop(id);
-};
-
-// ═══ ENTRY POINT ══════════════════════════════════════════════
-console.log('[HCM] Registering entry point...');
-
-function hcmInit() {
-    try {
-        console.log('[HCM] hcmInit() called');
-        S();
-        createPanel();
-        registerHooks();
-        updateInjection();
-        console.log('[HCM] ✓ Extension ready — launcher tab should be on right edge of screen');
-    } catch(e) {
-        console.error('[HCM] Init error:', e);
-        // ถ้า crash ให้แสดง debug dot สีแดงที่มุมขวาล่าง
-        const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;bottom:10px;right:10px;z-index:99999;' +
-            'background:red;color:white;padding:6px 12px;font-size:12px;border-radius:4px;' +
-            'font-family:monospace;cursor:pointer;';
-        dbg.textContent = 'HCM ERROR — click for details';
-        dbg.title = String(e);
-        dbg.onclick = () => alert('[HCM Error]\n' + e.stack);
-        document.body.appendChild(dbg);
-    }
-}
-
-// ลอง 3 วิธี ให้มั่นใจว่า run ได้
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', hcmInit);
-} else {
-    // DOM พร้อมแล้ว
-    if (typeof jQuery !== 'undefined') {
-        jQuery(hcmInit);
-    } else {
-        hcmInit();
-    }
-   }
-       
+#hcm-pprev { border: 1px solid var(--bdr); padding: 14px; min-height: 70px; background: white; }
+    
