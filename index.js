@@ -260,9 +260,9 @@ function buildHTML() {
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
           <div id="hcm-codelist"></div>
           <div class="hcm-btns">
-            <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
+                      <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
             <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export</button>
-                   </div>
+          </div>
         </div>
         <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
@@ -388,96 +388,88 @@ function initDrag() {
     const panel   = document.getElementById('hcm-panel');
     if (!handle || !panel) return;
 
-    // ─── MOVE drag ────────────────────────────────────────────
-    function startDrag(cx, cy) {
-        dragOn = true;
-        const r = panel.getBoundingClientRect();
-        dragOX = cx - r.left;
-        dragOY = cy - r.top;
+    // Overlay ครอบทั้งจอ — ไม่มีอะไร intercept ได้
+    const ovl = document.createElement('div');
+    ovl.id = 'hcm-drag-ovl';
+    ovl.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:2147483647',
+        'display:none', 'touch-action:none',
+        '-webkit-user-select:none', 'user-select:none'
+    ].join(';');
+    document.body.appendChild(ovl);
+
+    // ═══ MOVE ═══
+    let ox = 0, oy = 0;
+
+    function startMove(cx, cy) {
+        const r  = panel.getBoundingClientRect();
+        ox = cx - r.left;
+        oy = cy - r.top;
         panel.style.transition = 'none';
         panel.style.right      = 'auto';
         panel.style.transform  = 'none';
-        document.body.style.overflow   = 'hidden';
-        document.body.style.userSelect = 'none';
+        ovl.style.display      = 'block';
+        ovl.style.cursor       = 'grabbing';
+        dragOn = true;
     }
-    function moveDrag(cx, cy) {
+    function doMove(cx, cy) {
         if (!dragOn) return;
-        let nx = cx - dragOX;
-        let ny = cy - dragOY;
-        nx = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  nx));
-        ny = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, ny));
-        panel.style.left = nx + 'px';
-        panel.style.top  = ny + 'px';
+        panel.style.left = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  cx - ox)) + 'px';
+        panel.style.top  = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, cy - oy)) + 'px';
     }
-    function endDrag() {
+    function endMove() {
         if (!dragOn) return;
         dragOn = false;
-        panel.style.transition         = '';
-        document.body.style.overflow   = '';
-        document.body.style.userSelect = '';
+        panel.style.transition = '';
+        ovl.style.display      = 'none';
     }
 
-    // mouse
-    handle.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); startDrag(e.clientX, e.clientY); });
-    document.addEventListener('mousemove', e => { if (dragOn) { e.preventDefault(); moveDrag(e.clientX, e.clientY); } });
-    document.addEventListener('mouseup', endDrag);
+    handle.addEventListener('mousedown',      e => { e.preventDefault(); startMove(e.clientX, e.clientY); });
+    ovl.addEventListener   ('mousemove',      e => doMove(e.clientX, e.clientY));
+    ovl.addEventListener   ('mouseup',        endMove);
+    handle.addEventListener('touchstart',     e => { e.preventDefault(); startMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    ovl.addEventListener   ('touchmove',      e => { e.preventDefault(); doMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+    ovl.addEventListener   ('touchend',       endMove);
+    ovl.addEventListener   ('touchcancel',    endMove);
 
-    // touch — both start AND move must be passive:false to block ST scroll
-    handle.addEventListener('touchstart', e => {
-        e.preventDefault(); e.stopPropagation();
-        startDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    // put touchmove on document so it tracks even if finger slides off handle
-    document.addEventListener('touchmove', e => {
-        if (!dragOn) return;
-        e.preventDefault(); e.stopPropagation();
-        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    document.addEventListener('touchend', endDrag);
-    document.addEventListener('touchcancel', endDrag);
-
-    // ─── RESIZE drag (bottom bar) ─────────────────────────────
+    // ═══ RESIZE ═══
     if (!rHandle) return;
-    let resizeOn = false, resizeStartY = 0, resizeStartH = 0;
+    let ry = 0, rh = 0, resizeOn = false;
+
+    const rovl = document.createElement('div');
+    rovl.id = 'hcm-resize-ovl';
+    rovl.style.cssText = [
+        'position:fixed', 'inset:0', 'z-index:2147483647',
+        'display:none', 'touch-action:none', 'cursor:ns-resize'
+    ].join(';');
+    document.body.appendChild(rovl);
 
     function startResize(cy) {
-        resizeOn = true; resizeStartY = cy;
-        resizeStartH = panel.offsetHeight;
-        panel.style.transition         = 'none';
-        document.body.style.overflow   = 'hidden';
-        document.body.style.userSelect = 'none';
+        resizeOn = true; ry = cy; rh = panel.offsetHeight;
+        panel.style.transition = 'none';
+        rovl.style.display     = 'block';
     }
-    function moveResize(cy) {
+    function doResize(cy) {
         if (!resizeOn) return;
-        const newH = Math.max(300, Math.min(window.innerHeight - 20, resizeStartH + (cy - resizeStartY)));
-        panel.style.maxHeight = newH + 'px';
-        panel.style.height    = newH + 'px';
-        // keep canvas matched
+        const newH = Math.max(260, Math.min(window.innerHeight - 20, rh + (cy - ry)));
+        panel.style.height = panel.style.maxHeight = newH + 'px';
         const sc = document.getElementById('hcm-sc');
         if (sc) { sc.width = panel.offsetWidth; sc.height = newH; }
     }
     function endResize() {
         if (!resizeOn) return;
         resizeOn = false;
-        panel.style.transition         = '';
-        document.body.style.overflow   = '';
-        document.body.style.userSelect = '';
+        panel.style.transition = '';
+        rovl.style.display     = 'none';
     }
 
-    rHandle.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); startResize(e.clientY); });
-    document.addEventListener('mousemove', e => { if (resizeOn) { e.preventDefault(); moveResize(e.clientY); } });
-    document.addEventListener('mouseup', endResize);
-    rHandle.addEventListener('touchstart', e => {
-        e.preventDefault(); e.stopPropagation();
-        startResize(e.touches[0].clientY);
-    }, { passive: false });
-    document.addEventListener('touchmove', e => {
-        if (!resizeOn) return;
-        e.preventDefault(); e.stopPropagation();
-        moveResize(e.touches[0].clientY);
-    }, { passive: false });
-    document.addEventListener('touchend', endResize);
-    document.addEventListener('touchcancel', endResize);
+    rHandle.addEventListener('mousedown',  e => { e.preventDefault(); startResize(e.clientY); });
+    rovl.addEventListener   ('mousemove',  e => doResize(e.clientY));
+    rovl.addEventListener   ('mouseup',    endResize);
+    rHandle.addEventListener('touchstart', e => { e.preventDefault(); startResize(e.touches[0].clientY); }, { passive: false });
+    rovl.addEventListener   ('touchmove',  e => { e.preventDefault(); doResize(e.touches[0].clientY); }, { passive: false });
+    rovl.addEventListener   ('touchend',   endResize);
+    rovl.addEventListener   ('touchcancel',endResize);
 }
 
 
@@ -530,7 +522,7 @@ function bindEvents() {
 // ── Navigation ────────────────────────────────────────────────
 function openPanel() {
     isOpen = true;
-    const p = document.getElementById('hcm-panel');
+            const p = document.getElementById('hcm-panel');
     p.classList.add('hcm-open');
     // center on first open
     if (!p.style.left) {
@@ -790,4 +782,4 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
-
+                    
