@@ -260,7 +260,7 @@ function buildHTML() {
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
           <div id="hcm-codelist"></div>
           <div class="hcm-btns">
-                      <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
+                          <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
             <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export</button>
           </div>
         </div>
@@ -782,4 +782,3 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
-                    
