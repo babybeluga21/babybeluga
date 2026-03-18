@@ -1,3 +1,4 @@
+
 /**
  * HCM Diary Extension v2.1
  * ใช้ global variables ของ ST — ไม่มี import statement
@@ -255,15 +256,19 @@ let selectedDate  = null;
 function createPanel() {
     if (document.getElementById('hcm-panel')) return;
 
-    // ── Launcher tab (right edge) ──
+    // ── Backdrop (dark nebula behind panel) ──
+    const bd = document.createElement('div');
+    bd.id = 'hcm-backdrop';
+    document.body.appendChild(bd);
+
+    // ── Launcher tab ──
     const launcher = document.createElement('div');
     launcher.id = 'hcm-launcher';
-    launcher.innerHTML = `
-      <div id="hcm-ltab">
-        <div class="hcm-lt-gem"><span>H</span></div>
-        <div class="hcm-lt-lbl">HCM</div>
-        <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>
-      </div>`;
+    launcher.innerHTML = `<div id="hcm-ltab">
+      <div class="hcm-lt-gem"><span>H</span></div>
+      <div class="hcm-lt-lbl">HCM</div>
+      <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>
+    </div>`;
     launcher.querySelector('#hcm-ltab').addEventListener('click', togglePanel);
     document.body.appendChild(launcher);
 
@@ -273,9 +278,62 @@ function createPanel() {
     panel.innerHTML = buildHTML();
     document.body.appendChild(panel);
 
+    // ── Draggable ──
+    makeDraggable(panel);
+
     bindEvents();
     startClock();
     refreshAllUI();
+}
+
+function makeDraggable(panel) {
+    let dragging = false, ox = 0, oy = 0;
+    const handle = panel.querySelector('.hcm-drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('mousedown', e => {
+        dragging = true;
+        const r = panel.getBoundingClientRect();
+        ox = e.clientX - r.left;
+        oy = e.clientY - r.top;
+        panel.style.transition = 'none';
+        e.preventDefault();
+    });
+    handle.addEventListener('touchstart', e => {
+        dragging = true;
+        const t = e.touches[0];
+        const r = panel.getBoundingClientRect();
+        ox = t.clientX - r.left;
+        oy = t.clientY - r.top;
+        panel.style.transition = 'none';
+    }, { passive: true });
+
+    document.addEventListener('mousemove', e => {
+        if (!dragging) return;
+        movePanel(e.clientX - ox, e.clientY - oy);
+    });
+    document.addEventListener('touchmove', e => {
+        if (!dragging) return;
+        const t = e.touches[0];
+        movePanel(t.clientX - ox, t.clientY - oy);
+    }, { passive: true });
+
+    const stop = () => { dragging = false; };
+    document.addEventListener('mouseup', stop);
+    document.addEventListener('touchend', stop);
+
+    function movePanel(x, y) {
+        const pw = panel.offsetWidth  || 320;
+        const ph = panel.offsetHeight || 500;
+        const maxX = window.innerWidth  - pw;
+        const maxY = window.innerHeight - ph;
+        x = Math.max(0, Math.min(x, maxX));
+        y = Math.max(0, Math.min(y, maxY));
+        panel.style.left      = x + 'px';
+        panel.style.top       = y + 'px';
+        panel.style.right     = 'auto';
+        panel.style.transform = 'none';
+    }
 }
 
 // ─── HTML structure ────────────────────────────────────────────
@@ -299,9 +357,9 @@ function buildHTML() {
         <span id="hcm-chatname">SillyTavern</span>
       </div>
       <div class="hcm-sb-r" id="hcm-charname">—</div>
-    </div>
+          </div>
 
-    <div class="hcm-hd">
+    <div class="hcm-hd hcm-drag-handle">
       <div class="hcm-hdm">
         <span class="hcm-eyebrow" id="hcm-eyebrow">HCM Diary</span>
         <div class="hcm-title" id="hcm-title">สารบัญระบบ</div>
@@ -488,7 +546,7 @@ function bindEvents() {
     // TOC row click
     document.querySelectorAll('.hcm-trow.hcm-can').forEach(row => {
         row.addEventListener('click', () => openSection(row.dataset.nav));
-            });
+    });
 
     // Code sub-tabs
     document.querySelectorAll('#hcm-tabs-code .hcm-stab').forEach(t =>
@@ -556,14 +614,22 @@ function bindEvents() {
 
 // ═══ NAVIGATION ═══════════════════════════════════════════════
 function panelOpen() {
+function _bdShow(show) {
+    const bd = document.getElementById('hcm-backdrop');
+    if (bd) bd.classList.toggle('hcm-show', show);
+}
+function panelOpen() {
     const p = document.getElementById('hcm-panel');
     return p && p.classList.contains('hcm-open');
 }
 function openPanel() {
     document.getElementById('hcm-panel').classList.add('hcm-open');
+    _bdShow(true);
 }
 function togglePanel() {
+    const isOpen = panelOpen();
     document.getElementById('hcm-panel').classList.toggle('hcm-open');
+    _bdShow(!isOpen);
 }
 
 function setActiveBm(section) {
@@ -649,7 +715,7 @@ function renderCalGrid() {
     const pf      = document.getElementById('hcm-pfilter').value;
     const events  = calData().events.filter(e => !pf || e.person === pf);
     const first   = new Date(year, month, 1).getDay();
-    const last    = new Date(year, month + 1, 0).getDate();
+        const last    = new Date(year, month + 1, 0).getDate();
     const todayS  = dateStr(new Date());
     const grid    = document.getElementById('hcm-cal-grid');
     grid.innerHTML = '';
@@ -1007,3 +1073,4 @@ if (document.readyState === 'loading') {
         hcmInit();
     }
 }
+    
