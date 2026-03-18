@@ -268,7 +268,7 @@ function buildHTML() {
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
           <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ด้วย &lt;codeN&gt;</div></div></div>
           <div class="hcm-feat"><div class="hcm-fn"><span>II</span></div><div><div class="hcm-fname">ประหยัด token</div><div class="hcm-fdesc">~450 token → ~12 token ต่อบล็อก</div></div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
+                    <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
           <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">ส่งกำหนดการเข้า context ก่อนโรลทุกครั้ง</div></div></div>
         </div>
       </div>
@@ -394,6 +394,7 @@ function initDrag() {
         const r = panel.getBoundingClientRect();
         dragOX = cx - r.left; dragOY = cy - r.top;
         panel.style.transition = 'none';
+        document.body.style.overflow = 'hidden';
     }
     function moveDrag(cx, cy) {
         if (!dragOn) return;
@@ -403,13 +404,20 @@ function initDrag() {
         panel.style.left = nx + 'px'; panel.style.top = ny + 'px';
         panel.style.right = 'auto'; panel.style.transform = 'none';
     }
-    function endDrag() { dragOn = false; panel.style.transition = ''; }
+    function endDrag() {
+        if (!dragOn) return;
+        dragOn = false;
+        panel.style.transition = '';
+        document.body.style.overflow = '';
+    }
 
-    handle.addEventListener('mousedown',  e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
-    document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+    handle.addEventListener('mousedown',  e => { e.preventDefault(); e.stopPropagation(); startDrag(e.clientX, e.clientY); });
+    document.addEventListener('mousemove', e => { if (dragOn) { e.preventDefault(); moveDrag(e.clientX, e.clientY); } });
     document.addEventListener('mouseup',   endDrag);
-    handle.addEventListener('touchstart',  e => { const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
-    document.addEventListener('touchmove',  e => { if (!dragOn) return; const t = e.touches[0]; moveDrag(t.clientX, t.clientY); }, { passive: true });
+    // touchstart: passive ok (just record start point)
+    handle.addEventListener('touchstart',  e => { e.stopPropagation(); const t = e.touches[0]; startDrag(t.clientX, t.clientY); }, { passive: true });
+    // touchmove: NOT passive so we can preventDefault and block ST scroll
+    handle.addEventListener('touchmove', e => { e.preventDefault(); e.stopPropagation(); const t = e.touches[0]; moveDrag(t.clientX, t.clientY); }, { passive: false });
     document.addEventListener('touchend',   endDrag);
 
     // ─ Resize drag (bottom handle) ─
@@ -421,24 +429,29 @@ function initDrag() {
         resizeStartY = cy;
         resizeStartH = panel.offsetHeight;
         panel.style.transition = 'none';
-        document.body.style.userSelect = 'none';
+        document.body.style.overflow = 'hidden';
     }
     function moveResize(cy) {
         if (!resizeOn) return;
         const newH = Math.max(300, Math.min(window.innerHeight - 20, resizeStartH + (cy - resizeStartY)));
         panel.style.maxHeight = newH + 'px';
         panel.style.height    = newH + 'px';
-        // resize stars canvas too
         const sc = document.getElementById('hcm-sc');
         if (sc) { sc.width = panel.offsetWidth; sc.height = newH; }
     }
-    function endResize() { resizeOn = false; panel.style.transition = ''; document.body.style.userSelect = ''; }
+    function endResize() {
+        if (!resizeOn) return;
+        resizeOn = false;
+        panel.style.transition = '';
+        document.body.style.overflow = '';
+    }
 
-    rHandle.addEventListener('mousedown',  e => { e.preventDefault(); startResize(e.clientY); });
-    document.addEventListener('mousemove', e => { if (resizeOn) moveResize(e.clientY); });
+    rHandle.addEventListener('mousedown',  e => { e.preventDefault(); e.stopPropagation(); startResize(e.clientY); });
+    document.addEventListener('mousemove', e => { if (resizeOn) { e.preventDefault(); moveResize(e.clientY); } });
     document.addEventListener('mouseup',   endResize);
-    rHandle.addEventListener('touchstart',  e => { startResize(e.touches[0].clientY); }, { passive: true });
-    document.addEventListener('touchmove',  e => { if (!resizeOn) return; moveResize(e.touches[0].clientY); e.preventDefault(); }, { passive: false });
+    rHandle.addEventListener('touchstart',  e => { e.stopPropagation(); startResize(e.touches[0].clientY); }, { passive: true });
+    // NOT passive — ต้องกัน scroll ของ ST
+    rHandle.addEventListener('touchmove',  e => { e.preventDefault(); e.stopPropagation(); moveResize(e.touches[0].clientY); }, { passive: false });
     document.addEventListener('touchend',   endResize);
 }
 
@@ -525,7 +538,7 @@ function bindEvents() {
         document.getElementById('hcm-ptsrc' ).style.display = t.dataset.pt === 'src'  ? 'block' : 'none';
         document.getElementById('hcm-ptprev').style.display = t.dataset.pt === 'prev' ? 'block' : 'none';
     }));
-
+            
     initDrag();
     initResize();
 }
@@ -793,8 +806,4 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
-
-
-
-
-
+        
