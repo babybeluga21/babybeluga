@@ -1,3 +1,4 @@
+
 /**
  * HCM Diary v2.2 — no imports, window globals only
  */
@@ -239,7 +240,7 @@ function buildHTML() {
           <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
           <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
         </div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+                            <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-note-card">
@@ -260,7 +261,7 @@ function buildHTML() {
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
           <div id="hcm-codelist"></div>
           <div class="hcm-btns">
-                          <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
+            <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
             <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export</button>
           </div>
         </div>
@@ -384,9 +385,12 @@ function initStars() {
 // ── Drag + Resize ─────────────────────────────────────────────
 function initDrag() {
     const handle  = document.getElementById('hcm-drag-handle');
-    const rHandle = document.getElementById('hcm-resize-handle') || document.querySelector('.hcm-hind');
     const panel   = document.getElementById('hcm-panel');
     if (!handle || !panel) return;
+
+    // rHandle ค้นหาตอน runtime เพื่อให้แน่ใจว่า DOM พร้อมแล้ว
+    const rHandle = document.getElementById('hcm-resize-handle')
+                 || document.querySelector('.hcm-hind');
 
     // Overlay ครอบทั้งจอ — ไม่มีอะไร intercept ได้
     const ovl = document.createElement('div');
@@ -476,7 +480,6 @@ function initDrag() {
 function bindEvents() {
     document.getElementById('hcm-close').addEventListener('click', togglePanel);
     document.getElementById('hcm-back' ).addEventListener('click', navBack);
-
     document.querySelectorAll('.hcm-bm').forEach(bm => bm.addEventListener('click', () => {
         if (!isOpen) openPanel();
         if (bm.dataset.bm === 'toc') navBack(); else openSec(bm.dataset.bm);
@@ -522,7 +525,7 @@ function bindEvents() {
 // ── Navigation ────────────────────────────────────────────────
 function openPanel() {
     isOpen = true;
-            const p = document.getElementById('hcm-panel');
+    const p = document.getElementById('hcm-panel');
     p.classList.add('hcm-open');
     // center on first open
     if (!p.style.left) {
@@ -782,3 +785,5 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
+            
+                        
