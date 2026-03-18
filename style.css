@@ -12,48 +12,48 @@
   font-family:'Sarabun',sans-serif;
 }
 
-/* ── Launcher ─────────────────────────────────────────────────
-   เล็กลง, ย้ายลงมาที่ 65%, style gem เหมือนเดิม */
+/* ── Launcher — tab ติดขอบขวา สี่เหลี่ยมเล็ก ─────────────── */
 #hcm-launcher {
   position:fixed !important;
   right:0 !important;
-  top:65% !important;
+  top:72% !important;
+  bottom:auto !important;
   transform:translateY(-50%) !important;
   z-index:99999 !important;
-  width:28px;
-  padding:10px 4px 9px;
-  display:flex !important; flex-direction:column; align-items:center; gap:5px;
+  width:28px; height:28px;
+  display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:0;
   cursor:pointer;
-  border:1px solid rgba(255,255,255,.18); border-right:none; border-radius:4px 0 0 4px;
-  background:rgba(18,14,40,.88);
-  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-  box-shadow:-2px 0 20px rgba(0,0,0,.5);
-  transition:width .16s; overflow:hidden; position:relative;
+  border:1px solid rgba(255,255,255,.2); border-right:none; border-radius:4px 0 0 4px;
+  background:rgba(140,56,104,.92);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  box-shadow:-2px 0 14px rgba(0,0,0,.55), 0 0 0 1px rgba(200,130,180,.15);
+  overflow:hidden; transition:width .15s;
 }
+#hcm-launcher:hover { width:34px; }
 #hcm-launcher::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
   background:linear-gradient(90deg,var(--pk3),var(--lv),var(--go));
 }
-#hcm-launcher:hover { width:34px; }
+#hcm-launcher:active { opacity:.8; }
 .hcm-lt-gem {
-  width:18px; height:18px; border:1.5px solid rgba(220,180,100,.45);
+  width:16px; height:16px; border:1.5px solid rgba(220,180,100,.5);
   transform:rotate(45deg); display:flex; align-items:center; justify-content:center;
-  background:rgba(255,255,255,.04);
+  background:rgba(255,255,255,.05);
 }
 .hcm-lt-gem span {
   transform:rotate(-45deg);
   font-family:'Cormorant Garamond',serif; font-style:italic;
   font-size:9px; font-weight:700; color:var(--pk2);
 }
-.hcm-lt-lbl {
-  writing-mode:vertical-rl; font-size:5.5px; font-weight:600;
-  color:var(--ik3); letter-spacing:1.5px;
-}
+.hcm-lt-lbl { display:none; }
 #hcm-bdg {
-  width:13px; height:13px; background:var(--pk3);
-  transform:rotate(45deg); display:flex; align-items:center; justify-content:center;
+  position:absolute; top:-5px; right:-5px;
+  width:14px; height:14px; background:var(--pk3); border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  border:1.5px solid rgba(12,9,28,.9);
+  box-shadow:0 1px 6px rgba(200,80,130,.4);
 }
-#hcm-bdg span { transform:rotate(-45deg); font-size:6.5px; font-weight:900; color:white; }
+#hcm-bdg span { font-size:7px; font-weight:900; color:white; }
 
 /* ── Panel ────────────────────────────────────────────────────
    ขนาดเล็กลง 315px, ซ่อนเริ่มต้น, เปิดด้วย .hcm-open */
@@ -127,7 +127,7 @@
   background-image:
     linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
     linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
-    background-size:22px 22px;
+  background-size:22px 22px;
 }
 /* top frost sheen */
 .hcm-book::before {
@@ -135,7 +135,6 @@
   background:linear-gradient(rgba(255,255,255,.03),transparent);
   pointer-events:none; z-index:7;
 }
-
 /* bands */
 .hcm-band { flex-shrink:0; height:3px; position:relative; z-index:10; }
 .hcm-top  { background:linear-gradient(90deg,var(--pk4),var(--pk3) 30%,var(--lv2) 60%,var(--go) 80%,var(--pk4)); box-shadow:0 0 8px rgba(200,140,230,.4); }
@@ -358,10 +357,34 @@
 .hcm-empty { text-align:center; padding:18px 8px; }
 .hcm-empty p { font-family:'Cormorant Garamond',serif; font-style:italic; font-size:11px; color:var(--ik4); }
 
-/* home indicator */
-.hcm-hind { padding:3px 0 6px; display:flex; align-items:center; justify-content:center; border-top:1px solid var(--bdr); position:relative; z-index:10; }
-.hcm-hind::before { content:''; position:absolute; top:0; left:18%; right:18%; height:1px; background:linear-gradient(90deg,transparent,var(--god),transparent); }
-.hcm-hbar { width:55px; height:3px; background:rgba(190,140,200,.18); border-radius:2px; }
+/* home indicator / resize handle — ลากขึ้นลงเพื่อปรับความสูง */
+.hcm-hind {
+  height:20px; display:flex; align-items:center; justify-content:center;
+  border-top:1px solid var(--bdr); position:relative; z-index:10;
+  cursor:ns-resize; flex-shrink:0;
+  background:rgba(255,255,255,.025);
+  transition:background .15s;
+  touch-action:none;
+}
+.hcm-hind:hover, .hcm-hind:active { background:rgba(200,140,220,.1); }
+.hcm-hind:hover .hcm-hbar, .hcm-hind:active .hcm-hbar {
+  background:rgba(190,140,200,.65); width:52px; height:4px;
+}
+.hcm-hind::before {
+  content:''; position:absolute; top:0; left:14%; right:14%; height:1px;
+  background:linear-gradient(90deg,transparent,var(--god),transparent);
+}
+/* grip dots */
+.hcm-hind::after {
+  content:'· · ·'; position:absolute; top:50%; transform:translateY(-50%);
+  font-size:8px; color:rgba(200,140,200,.35); letter-spacing:2px; line-height:1;
+  pointer-events:none;
+}
+.hcm-hbar {
+  width:44px; height:3px; background:rgba(190,140,200,.28); border-radius:2px;
+  transition:background .15s, width .15s, height .15s;
+  position:relative; z-index:1;
+}
 
 /* ── Inline block (ใน ST chat) ────────────────────────────── */
 .hcm-inline-block { display:inline-flex; align-items:center; gap:6px; background:rgba(22,16,46,.8); backdrop-filter:blur(8px); border:1px solid rgba(200,140,200,.25); padding:5px 10px; margin:3px 0; cursor:pointer; }
@@ -386,4 +409,4 @@
 .hcm-ptt.hcm-on { color:var(--pk2); border-bottom-color:var(--pk3); }
 .hcm-pb { flex:1; overflow-y:auto; padding:11px; }
 #hcm-pprev { border:1px solid var(--bdr); padding:12px; min-height:60px; background:white; }
-                 
+              
