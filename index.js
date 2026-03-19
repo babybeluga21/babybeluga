@@ -229,10 +229,10 @@ function buildHTML() {
         <div class="hcm-note-card">
           <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
           <div class="hcm-nc-body">AI ใส่ tag ในบทโรล → extension จับ → ลบ → บันทึก → inject ก่อนโรลถัดไป<br><br>
-                    <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
+          <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
           symbols: heart · star · diamond · note · cross · task · general</div>
         </div>
-      </div>
+              </div>
       <div id="hcm-v-code" style="display:none;flex-direction:column">
         <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
           <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
@@ -354,12 +354,10 @@ function initDrag() {
     const panel = document.getElementById('hcm-panel');
     if (!panel) return;
 
-    // ลากได้จากทุก element ที่มี class hcm-drag-zone
-    const zones = panel.querySelectorAll('.hcm-drag-zone');
-    let ox=0, oy=0, on=false;
+    let ox=0, oy=0, on=false, moved=false;
 
     function start(cx, cy) {
-        on = true;
+        on = true; moved = false;
         const r = panel.getBoundingClientRect();
         ox = cx - r.left; oy = cy - r.top;
         panel.style.transition = 'none';
@@ -369,6 +367,7 @@ function initDrag() {
     }
     function move(cx, cy) {
         if (!on) return;
+        moved = true;
         let nx = cx - ox, ny = cy - oy;
         const pw = panel.offsetWidth, ph = panel.offsetHeight;
         nx = Math.max(0, Math.min(window.innerWidth  - pw, nx));
@@ -378,12 +377,24 @@ function initDrag() {
     }
     function end() { on = false; panel.style.userSelect = ''; }
 
-    zones.forEach(h => {
-        h.addEventListener('mousedown',  e => { e.preventDefault(); start(e.clientX, e.clientY); });
-        h.addEventListener('touchstart', e => {
-            const t = e.touches[0]; start(t.clientX, t.clientY);
-        }, { passive: true });
+    // elements ที่ห้าม trigger drag (ปุ่ม, input, scroll)
+    const SKIP_TAGS = new Set(['BUTTON','INPUT','SELECT','TEXTAREA','A']);
+
+    panel.addEventListener('mousedown', e => {
+        if (SKIP_TAGS.has(e.target.tagName)) return;
+        if (e.target.closest('.hcm-body')) return;  // scroll area
+        if (e.target.closest('#hcm-pop')) return;
+        e.preventDefault();
+        start(e.clientX, e.clientY);
     });
+
+    panel.addEventListener('touchstart', e => {
+        if (SKIP_TAGS.has(e.target.tagName)) return;
+        if (e.target.closest('.hcm-body')) return;
+        if (e.target.closest('#hcm-pop')) return;
+        const t = e.touches[0];
+        start(t.clientX, t.clientY);
+    }, { passive: true });
 
     document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     document.addEventListener('mouseup',   end);
@@ -455,7 +466,7 @@ function openPanel() {
     setTimeout(()=>{
         const c=document.getElementById('hcm-sc');
         if(c){ c.width=p.offsetWidth; c.height=p.offsetHeight; }
-    }, 60);
+                }, 60);
 }
 function closePanel() { isOpen=false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
 function togglePanel() { isOpen ? closePanel() : openPanel(); }
@@ -691,4 +702,4 @@ function hcmInit(){
 if(typeof jQuery!=='undefined') jQuery(hcmInit);
 else if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hcmInit);
 else hcmInit();
-                                                           
+        
