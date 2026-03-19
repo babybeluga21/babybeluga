@@ -266,8 +266,8 @@ function buildHTML() {
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
           </div>
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
-                    <div id="hcm-codelist"></div>
-          <button class="hcm-btns2" id="hcm-clear-btn" style="width:100%;margin-top:6px">&#215; ล้างทั้งหมด</button>
+          <div id="hcm-codelist"></div>
+                    <button class="hcm-btns2" id="hcm-clear-btn" style="width:100%;margin-top:6px">&#215; ล้างทั้งหมด</button>
         </div>
         <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
@@ -356,7 +356,8 @@ function initStars() {
                 x: Math.random() * w, y: Math.random() * h,
                 r: s < .72 ? .4 : s < .9 ? .75 : 1.15,
                 a: Math.random(),
-                da: (.0003 + Math.random() * .0006) * (Math.random() < .5 ? 1 : -1),
+                // ค่าเดิมช้าเกิน (.0003) เปลี่ยนเป็น .004-.012 ให้ดาวกระพริบเห็นได้ชัด
+                da: (.004 + Math.random() * .008) * (Math.random() < .5 ? 1 : -1),
                 col: Math.random() < .65 ? '255,255,255' : Math.random() < .5 ? '200,175,255' : '165,205,255'
             });
         }
@@ -376,11 +377,14 @@ function initStars() {
 
     function draw() {
         animId = requestAnimationFrame(draw);
-        const panel = document.getElementById('hcm-panel');
-        if (!panel || !panel.classList.contains('hcm-open')) return; // pause when hidden
+        // ดาวต้องขยับเสมอ ไม่หยุดแม้ panel ปิด (ไม่งั้นตอนเปิดดาวไม่ไหว)
+        if (W === 0 || H === 0) return;
 
-        // check size changed
-        if (panel.offsetWidth !== W || panel.offsetHeight !== H) resize();
+        // check size changed (panel อาจ resize)
+        const panel = document.getElementById('hcm-panel');
+        if (panel && panel.classList.contains('hcm-open')) {
+            if (panel.offsetWidth !== W || panel.offsetHeight !== H) resize();
+        }
 
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = '#0b0c1a';
@@ -532,9 +536,9 @@ function openPanel() {
         // center on first open
         p.style.display = 'block';
         const pw = p.offsetWidth  || 315;
-        const ph = p.offsetHeight || 500;
+                                   const ph = p.offsetHeight || 500;
         p.style.left = Math.max(4, Math.round((window.innerWidth  - pw) / 2)) + 'px';
-                    p.style.top  = Math.max(4, Math.round((window.innerHeight - ph) / 2)) + 'px';
+        p.style.top  = Math.max(4, Math.round((window.innerHeight - ph) / 2)) + 'px';
         p.style.transform = 'none';
         p.style.right = 'auto';
     }
@@ -800,4 +804,4 @@ function hcmInit() {
 if (typeof jQuery !== 'undefined') jQuery(hcmInit);
 else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
 else hcmInit();
-            
+        
