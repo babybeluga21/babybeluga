@@ -1,3 +1,4 @@
+
 /**
  * HCM Diary v2.2 — no imports, window globals only
  */
@@ -223,9 +224,14 @@ function buildHTML() {
           <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
           <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
         </div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
-        <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-can" data-nav="cal">
+          <div class="hcm-tl"><div class="hcm-tbig">K</div><div class="hcm-tabb">CAL</div></div>
+          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">ปฏิทินตัวละคร</div><div class="hcm-tdesc">นัดหมาย · กิจกรรม · แยกต่อแชท</div></div>
+          <div class="hcm-tr"><div class="hcm-tgem hcm-gold"><span>II</span></div></div><div class="hcm-tarrow">&#8250;</div>
+        </div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 05</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-note-card">
           <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
           <div class="hcm-nc-body">AI ใส่ tag ในบทโรล → extension จับ → ลบ → บันทึก → inject ก่อนโรลถัดไป<br><br>
@@ -234,7 +240,7 @@ function buildHTML() {
         </div>
       </div>
       <div id="hcm-v-code" style="display:none;flex-direction:column">
-              <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
+        <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
           <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
           <div class="hcm-srow">
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
@@ -253,7 +259,7 @@ function buildHTML() {
             <div class="hcm-toggle-lbl">&#10021; ลากหน้าต่างได้</div>
             <div class="hcm-tog" id="hcm-tog-drag"><span></span></div>
           </div>
-          <div class="hcm-toggle-row hcm-tog-disabled">
+                    <div class="hcm-toggle-row hcm-tog-disabled">
             <div class="hcm-toggle-lbl">— ระบบที่ 2</div>
             <div class="hcm-tog"><span></span></div>
           </div>
@@ -326,40 +332,70 @@ function initStars() {
     const canvas = document.getElementById('hcm-sc');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let W, H, stars = [];
-    function resize() {
-        const panel = document.getElementById('hcm-panel');
-        W = canvas.width  = panel.offsetWidth  || 315;
-        H = canvas.height = panel.offsetHeight || 600;
+    let W=1, H=1, stars=[];
+
+    function makeStars(w, h) {
         stars = [];
-        const n = Math.floor(W * H / 2800);
+        const n = Math.max(60, Math.floor(w * h / 2000));
         for (let i = 0; i < n; i++) {
-            const s = Math.random();
-            stars.push({ x: Math.random()*W, y: Math.random()*H,
-                r: s<.72?.38:s<.9?.7:1.1,
-                a: Math.random(), da:(.0002+Math.random()*.0005)*(Math.random()<.5?1:-1),
-                col: Math.random()<.65?'255,255,255':Math.random()<.5?'200,175,255':'165,205,255' });
+            const sz = Math.random();
+            stars.push({
+                x:  Math.random() * w,
+                y:  Math.random() * h,
+                r:  sz < .6 ? .32 : sz < .88 ? .6 : .95,
+                a:  .08 + Math.random() * .82,
+                da: (.0003 + Math.random() * .001) * (Math.random() < .5 ? 1 : -1),
+                vx: (Math.random() - .5) * .035,   // ขยับซ้ายขวา
+                vy: (Math.random() - .5) * .035,   // ขยับบนล่าง
+                col: Math.random() < .5 ? '255,255,255' :
+                     Math.random() < .5 ? '220,200,255' : '175,220,255'
+            });
         }
     }
+
+    function resize() {
+        const panel = document.getElementById('hcm-panel');
+        if (!panel) return;
+        const pw = panel.offsetWidth, ph = panel.offsetHeight;
+        if (!pw || !ph) return;
+        W = canvas.width  = pw;
+        H = canvas.height = ph;
+        makeStars(W, H);
+    }
+
     function draw() {
         if (!document.getElementById('hcm-sc')) return;
-        ctx.clearRect(0,0,W,H);
-        ctx.fillStyle='#0b0c1a'; ctx.fillRect(0,0,W,H);
-        const g1=ctx.createRadialGradient(W*.22,H*.28,0,W*.22,H*.28,W*.55);
-        g1.addColorStop(0,'rgba(140,70,200,.07)'); g1.addColorStop(1,'transparent');
-        ctx.fillStyle=g1; ctx.fillRect(0,0,W,H);
-        const g2=ctx.createRadialGradient(W*.8,H*.65,0,W*.8,H*.65,W*.45);
-        g2.addColorStop(0,'rgba(70,90,210,.06)'); g2.addColorStop(1,'transparent');
-        ctx.fillStyle=g2; ctx.fillRect(0,0,W,H);
-        stars.forEach(s=>{
-            s.a+=s.da; if(s.a>1||s.a<.04)s.da*=-1;
-            ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-            ctx.fillStyle=`rgba(${s.col},${s.a.toFixed(2)})`; ctx.fill();
+        ctx.clearRect(0, 0, W, H);
+        // dark base
+        ctx.fillStyle = '#0b0c1a';
+        ctx.fillRect(0, 0, W, H);
+        // nebula glow
+        const g1 = ctx.createRadialGradient(W*.22, H*.28, 0, W*.22, H*.28, W*.55);
+        g1.addColorStop(0, 'rgba(140,70,200,.1)'); g1.addColorStop(1, 'transparent');
+        ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+        const g2 = ctx.createRadialGradient(W*.8, H*.65, 0, W*.8, H*.65, W*.45);
+        g2.addColorStop(0, 'rgba(70,90,210,.08)'); g2.addColorStop(1, 'transparent');
+        ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+        // draw + move stars
+        stars.forEach(s => {
+            s.a += s.da;
+            if (s.a > .92 || s.a < .05) s.da *= -1;
+            s.x += s.vx; s.y += s.vy;
+            // wrap around
+            if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+            if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${s.col},${s.a.toFixed(2)})`;
+            ctx.fill();
         });
         requestAnimationFrame(draw);
     }
-    resize(); draw();
-    document.getElementById('hcm-launcher').addEventListener('click', ()=>setTimeout(resize,80));
+
+    draw();
+    // resize เมื่อ panel เปิด
+    document.getElementById('hcm-launcher').addEventListener('click', () => setTimeout(resize, 60));
+    setTimeout(resize, 150);
 }
 
 // ── Drag (controlled by settings toggle) ─────────────────────
@@ -414,10 +450,24 @@ function bindEvents() {
     const togDrag = document.getElementById('hcm-tog-drag');
     if (togDrag) togDrag.addEventListener('click', toggleDragMode);
 
-    document.querySelectorAll('.hcm-bm').forEach(bm => bm.addEventListener('click', () => {
-        if (!isOpen) openPanel();
-        if (bm.dataset.bm === 'toc') navBack(); else openSec(bm.dataset.bm);
-    }));
+    document.querySelectorAll('.hcm-bm').forEach(bm => {
+        function handleBm() {
+            const target = bm.dataset.bm;
+            if (!isOpen) {
+                openPanel();
+                // delay เล็กน้อยรอ panel display:block ก่อน
+                setTimeout(() => {
+                    if (target === 'toc') navBack();
+                    else openSec(target);
+                }, 20);
+            } else {
+                if (target === 'toc') navBack();
+                else openSec(target);
+            }
+        }
+        bm.addEventListener('click', handleBm);
+        bm.addEventListener('touchend', e => { e.preventDefault(); handleBm(); });
+    });
     document.querySelectorAll('.hcm-trow.hcm-can').forEach(r =>
         r.addEventListener('click', () => openSec(r.dataset.nav)));
 
@@ -459,20 +509,23 @@ function openPanel() {
     isOpen = true;
     const p = document.getElementById('hcm-panel');
     p.classList.add('hcm-open');
-
-    // center ทุกครั้งที่เปิด (ยกเว้นถ้าผู้ใช้ลากไปแล้ว)
     if (!p.dataset.userMoved) {
         setTimeout(() => {
             const pw = p.offsetWidth  || 315;
             const ph = p.offsetHeight || 500;
             const nx = Math.max(4, Math.round((window.innerWidth  - pw) / 2));
             const ny = Math.max(4, Math.round((window.innerHeight - ph) / 2));
-            p.style.left      = nx + 'px';
-            p.style.top       = ny + 'px';
-            p.style.right     = 'auto';
-                                p.style.transform = 'none';
+            p.style.left = nx+'px'; p.style.top = ny+'px';
+            p.style.right = 'auto'; p.style.transform = 'none';
         }, 30);
-    }
+        }
+            // resize stars canvas เมื่อ panel มีขนาดจริง
+    setTimeout(() => {
+        const c = document.getElementById('hcm-sc');
+        if (c && p.offsetWidth > 10) {
+            c.width = p.offsetWidth; c.height = p.offsetHeight;
+        }
+    }, 60);
 }
 function closePanel() { isOpen=false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
 function togglePanel() { isOpen ? closePanel() : openPanel(); }
@@ -482,25 +535,43 @@ function setActiveBm(s) {
 }
 
 function openSec(s) {
-    curSection=s;
-    ['toc','code','cal'].forEach(v=>{ const e=document.getElementById(`hcm-v-${v}`); if(e) e.style.display='none'; });
-    document.getElementById('hcm-tabs-code').style.display='none';
-    document.getElementById('hcm-tabs-cal' ).style.display='none';
-    document.getElementById('hcm-back').style.display='flex';
+    curSection = s;
+    // hide all
+    ['toc','code','cal'].forEach(v => {
+        const e = document.getElementById(`hcm-v-${v}`);
+        if (e) { e.style.display = 'none'; e.style.flexDirection = ''; }
+    });
+    document.getElementById('hcm-tabs-code').style.display = 'none';
+    document.getElementById('hcm-tabs-cal' ).style.display = 'none';
+    document.getElementById('hcm-back').style.display = 'flex';
     setActiveBm(s);
-    if(s==='code'){
-        const vc=document.getElementById('hcm-v-code');
-        vc.style.display='flex'; vc.style.flexDirection='column';
-        document.getElementById('hcm-tabs-code').style.display='flex';
-        document.getElementById('hcm-sv-code').style.display='block';
-        setHdr('ระบบที่ 01','ตัวจัดการโค้ด','HTML Block Store');
+
+    if (s === 'code') {
+        const vc = document.getElementById('hcm-v-code');
+        vc.style.display = 'flex'; vc.style.flexDirection = 'column';
+        document.getElementById('hcm-tabs-code').style.display = 'flex';
+        // show active sub-tab (default: code list)
+        const activeSv = document.querySelector('#hcm-tabs-code .hcm-stab.hcm-on');
+        const svName   = activeSv ? activeSv.dataset.sv : 'code';
+        ['code','settings'].forEach(k => {
+            const el = document.getElementById(`hcm-sv-${k}`);
+            if (el) el.style.display = k === svName ? 'block' : 'none';
+        });
+        setHdr('ระบบที่ 01', 'ตัวจัดการโค้ด', 'HTML Block Store');
         refreshCodeUI();
     } else {
-        const vc=document.getElementById('hcm-v-cal');
-        vc.style.display='flex'; vc.style.flexDirection='column';
-        document.getElementById('hcm-tabs-cal').style.display='flex';
-        document.getElementById('hcm-calv-month').style.display='block';
-        setHdr('ระบบที่ 02','ปฏิทินตัวละคร','กิจกรรมในโรล');
+        // calendar
+        const vc = document.getElementById('hcm-v-cal');
+        vc.style.display = 'flex'; vc.style.flexDirection = 'column';
+        document.getElementById('hcm-tabs-cal').style.display = 'flex';
+        // show active cal sub-tab (default: month)
+        const activeCv = document.querySelector('#hcm-tabs-cal .hcm-stab.hcm-on');
+        const cvName   = activeCv ? activeCv.dataset.cv : 'month';
+        ['month','list','add'].forEach(k => {
+            const el = document.getElementById(`hcm-calv-${k}`);
+            if (el) el.style.display = k === cvName ? 'block' : 'none';
+        });
+        setHdr('ระบบที่ 02', 'ปฏิทินตัวละคร', 'กิจกรรมในโรล');
         buildPF(); renderGrid(); renderList();
     }
 }
