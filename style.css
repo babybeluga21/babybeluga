@@ -110,17 +110,19 @@
 }
 /* top frost */
 .hcm-book::before {
-    content:''; position:absolute; top:0; left:0; right:0; height:60px;
-  background:linear-gradient(rgba(255,255,255,.03),transparent);
+  content:''; position:absolute; top:0; left:0; right:0; height:60px;
+    background:linear-gradient(rgba(255,255,255,.03),transparent);
   pointer-events:none; z-index:7;
 }
 
-/* left accent line (แทน spine rings) */
+/* left accent — dot pattern แทน spine rings */
 .hcm-frame::before {
-  content:''; position:absolute; left:0; top:8%; bottom:8%; width:3px;
-  background:linear-gradient(to bottom, transparent, var(--pk3) 20%, var(--lv) 50%, var(--pk3) 80%, transparent);
-  border-radius:0 2px 2px 0; z-index:40; pointer-events:none;
-  box-shadow:0 0 8px rgba(200,130,180,.3);
+  content:'';
+  position:absolute; left:3px; top:12%; bottom:12%; width:5px;
+  background:
+    radial-gradient(circle 2px at center, rgba(207,192,240,.7) 0%, transparent 100%) center 0 / 5px 18px repeat-y,
+    linear-gradient(to bottom, transparent, rgba(180,130,220,.2) 20%, rgba(200,140,200,.35) 50%, rgba(180,130,220,.2) 80%, transparent);
+  z-index:40; pointer-events:none;
 }
 
 /* bands */
@@ -179,7 +181,8 @@
 .hcm-body::-webkit-scrollbar-thumb{background:rgba(180,120,200,.25);border-radius:2px}
 
 /* bottom drag bar */
-.hcm-hind{height:24px;display:flex;align-items:center;justify-content:center;border-top:1.5px solid rgba(200,140,220,.2);position:relative;z-index:10;background:rgba(255,255,255,.025);transition:background .15s}
+.hcm-hind{height:28px;display:flex;align-items:center;justify-content:center;border-top:1.5px solid rgba(200,140,220,.2);position:relative;z-index:10;background:rgba(255,255,255,.025);transition:background .15s;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;flex-shrink:0}
+.hcm-hind:active{cursor:grabbing}
 .hcm-hind:hover,.hcm-hind:active{background:rgba(200,140,220,.12)}
 .hcm-hind:hover .hcm-hbar,.hcm-hind:active .hcm-hbar{background:rgba(190,140,200,.7);width:50px}
 .hcm-hind::after{content:'· · · · ·';position:absolute;top:50%;transform:translateY(-50%);font-size:8px;color:rgba(200,140,200,.4);letter-spacing:3px;line-height:1;pointer-events:none}
@@ -222,7 +225,7 @@
 /* stats */
 .hcm-srow{display:flex;gap:6px;margin-bottom:7px}
 .hcm-sc2{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--bdr);padding:6px;text-align:center}
-                           .hcm-scv{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700;color:var(--pk2);line-height:1}
+.hcm-scv{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700;color:var(--pk2);line-height:1}
 .hcm-scl{font-size:6.5px;color:var(--ik4);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 
 /* code cards */
@@ -332,4 +335,4 @@
 .hcm-pb{flex:1;overflow-y:auto;padding:11px}
 #hcm-psrc{font-family:'Courier New',monospace;font-size:9px;color:rgba(255,255,255,.88);white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);padding:10px;display:block}
 #hcm-pprev{border:1px solid var(--bdr);padding:12px;min-height:60px;background:white}
-                                  
+  
