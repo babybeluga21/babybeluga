@@ -201,6 +201,7 @@ function buildHTML() {
         <div class="hcm-sub" id="hcm-sub">ส่วนขยาย SillyTavern</div>
       </div>
       <div class="hcm-hdbtns">
+        <div class="hcm-hdbtn" id="hcm-drag-toggle" title="เปิดโหมดลาก">&#10003;</div>
         <div class="hcm-hdbtn" id="hcm-back" style="display:none">&#8592;</div>
         <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
       </div>
@@ -232,10 +233,10 @@ function buildHTML() {
           <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
           symbols: heart · star · diamond · note · cross · task · general</div>
         </div>
-              </div>
+      </div>
       <div id="hcm-v-code" style="display:none;flex-direction:column">
         <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
-          <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
+                  <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
           <div class="hcm-srow">
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
@@ -350,14 +351,18 @@ function initStars() {
     document.getElementById('hcm-launcher').addEventListener('click', ()=>setTimeout(resize,80));
 }
 
+// ── Drag (toggle mode) ────────────────────────────────────────
+let dragMode = false;
+
 function initDrag() {
     const panel = document.getElementById('hcm-panel');
     if (!panel) return;
-
-    let ox=0, oy=0, on=false, moved=false;
+    let ox=0, oy=0, on=false;
 
     function start(cx, cy) {
-        on = true; moved = false;
+        if (!dragMode) return;
+        on = true;
+        // แก้ transform ก่อน bounding rect เที่ยง
         const r = panel.getBoundingClientRect();
         ox = cx - r.left; oy = cy - r.top;
         panel.style.transition = 'none';
@@ -367,7 +372,6 @@ function initDrag() {
     }
     function move(cx, cy) {
         if (!on) return;
-        moved = true;
         let nx = cx - ox, ny = cy - oy;
         const pw = panel.offsetWidth, ph = panel.offsetHeight;
         nx = Math.max(0, Math.min(window.innerWidth  - pw, nx));
@@ -377,27 +381,15 @@ function initDrag() {
     }
     function end() { on = false; panel.style.userSelect = ''; }
 
-    // elements ที่ห้าม trigger drag (ปุ่ม, input, scroll)
-    const SKIP_TAGS = new Set(['BUTTON','INPUT','SELECT','TEXTAREA','A']);
-
-    panel.addEventListener('mousedown', e => {
-        if (SKIP_TAGS.has(e.target.tagName)) return;
-        if (e.target.closest('.hcm-body')) return;  // scroll area
-        if (e.target.closest('#hcm-pop')) return;
-        e.preventDefault();
-        start(e.clientX, e.clientY);
-    });
-
-    panel.addEventListener('touchstart', e => {
-        if (SKIP_TAGS.has(e.target.tagName)) return;
-        if (e.target.closest('.hcm-body')) return;
-        if (e.target.closest('#hcm-pop')) return;
-        const t = e.touches[0];
-        start(t.clientX, t.clientY);
-    }, { passive: true });
-
+    // mouse
+    panel.addEventListener('mousedown',   e => { e.preventDefault(); start(e.clientX, e.clientY); });
     document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     document.addEventListener('mouseup',   end);
+
+    // touch — ทั้ง panel
+    panel.addEventListener('touchstart', e => {
+        const t = e.touches[0]; start(t.clientX, t.clientY);
+    }, { passive: true });
     document.addEventListener('touchmove', e => {
         if (!on) return;
         e.preventDefault();
@@ -406,9 +398,23 @@ function initDrag() {
     document.addEventListener('touchend', end);
 }
 
+function toggleDragMode() {
+    dragMode = !dragMode;
+    const btn   = document.getElementById('hcm-drag-toggle');
+    const panel = document.getElementById('hcm-panel');
+    if (btn) {
+        btn.classList.toggle('hcm-drag-on', dragMode);
+        btn.title = dragMode ? 'ปิดโหมดลาก' : 'เปิดโหมดลาก';
+    }
+    // cursor feedback
+    const book = panel && panel.querySelector('.hcm-book');
+    if (book) book.style.cursor = dragMode ? 'grab' : '';
+}
+
 function bindEvents() {
     document.getElementById('hcm-close').addEventListener('click', togglePanel);
     document.getElementById('hcm-back' ).addEventListener('click', navBack);
+    document.getElementById('hcm-drag-toggle').addEventListener('click', toggleDragMode);
 
     document.querySelectorAll('.hcm-bm').forEach(bm => bm.addEventListener('click', () => {
         if (!isOpen) openPanel();
@@ -455,18 +461,24 @@ function openPanel() {
     isOpen = true;
     const p = document.getElementById('hcm-panel');
     p.classList.add('hcm-open');
-    if (!p.style.left) {
-        const pw = p.offsetWidth || 315;
-        p.style.left = Math.max(4, Math.round((window.innerWidth - pw) / 2)) + 'px';
-        p.style.top  = '50%';
-        p.style.transform = 'translateY(-50%)';
-        p.style.right = 'auto';
+
+    // รอ 1 frame หลัง display:block แล้วค่อยวัด offsetWidth/Height จริง
+    if (!p.dataset.positioned) {
+        setTimeout(() => {
+            const pw = p.offsetWidth  || 315;
+            const ph = p.offsetHeight || 500;
+            const nx = Math.max(4, Math.round((window.innerWidth  - pw) / 2));
+            const ny = Math.max(4, Math.round((window.innerHeight - ph) / 2));
+            p.style.left      = nx + 'px';
+            p.style.top       = ny + 'px';
+            p.style.right     = 'auto';
+            p.style.transform = 'none';
+            p.dataset.positioned = '1';
+                        // resize canvas
+            const c = document.getElementById('hcm-sc');
+            if (c) { c.width = pw; c.height = p.offsetHeight; }
+        }, 30);
     }
-    // resize canvas หลังเปิด
-    setTimeout(()=>{
-        const c=document.getElementById('hcm-sc');
-        if(c){ c.width=p.offsetWidth; c.height=p.offsetHeight; }
-                }, 60);
 }
 function closePanel() { isOpen=false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
 function togglePanel() { isOpen ? closePanel() : openPanel(); }
@@ -702,4 +714,4 @@ function hcmInit(){
 if(typeof jQuery!=='undefined') jQuery(hcmInit);
 else if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hcmInit);
 else hcmInit();
-        
+            
