@@ -223,12 +223,7 @@ function buildHTML() {
           <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
           <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
         </div>
-        <div class="hcm-trow hcm-can" data-nav="cal">
-          <div class="hcm-tl"><div class="hcm-tbig">K</div><div class="hcm-tabb">CAL</div></div>
-          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">ปฏิทินตัวละคร</div><div class="hcm-tdesc">นัดหมาย · กิจกรรม · แยกต่อแชท</div></div>
-          <div class="hcm-tr"><div class="hcm-tgem hcm-gold"><span>II</span></div></div><div class="hcm-tarrow">&#8250;</div>
-        </div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 05</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
         <div class="hcm-note-card">
@@ -255,11 +250,11 @@ function buildHTML() {
         <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
           <div class="hcm-toggle-row" id="hcm-t-drag">
-                      <div class="hcm-toggle-lbl">&#10021; ลากหน้าต่างได้</div>
+            <div class="hcm-toggle-lbl">&#10021; ลากหน้าต่างได้</div>
             <div class="hcm-tog" id="hcm-tog-drag"><span></span></div>
           </div>
           <div class="hcm-toggle-row hcm-tog-disabled">
-            <div class="hcm-toggle-lbl">— ระบบที่ 2</div>
+                      <div class="hcm-toggle-lbl">— ระบบที่ 2</div>
             <div class="hcm-tog"><span></span></div>
           </div>
           <div class="hcm-toggle-row hcm-tog-disabled">
@@ -344,8 +339,8 @@ function initStars() {
                 r:  sz < .6 ? .32 : sz < .88 ? .6 : .95,
                 a:  .08 + Math.random() * .82,
                 da: (.0003 + Math.random() * .001) * (Math.random() < .5 ? 1 : -1),
-                vx: (Math.random() - .5) * .035,
-                vy: (Math.random() - .5) * .035,
+                vx: (Math.random() - .5) * .28,
+                vy: (Math.random() - .5) * .28,
                 col: Math.random() < .5 ? '255,255,255' :
                      Math.random() < .5 ? '220,200,255' : '175,220,255'
             });
@@ -364,33 +359,35 @@ function initStars() {
     };
 
     function draw() {
+        // ใช้ W,H จาก closure โดยตรง — ถ้า resize เปลี่ยน W,H loop จะเห็นค่าใหม่เสมอ
+        requestAnimationFrame(draw);
         if (!document.getElementById('hcm-sc')) return;
         ctx.clearRect(0, 0, W, H);
         ctx.fillStyle = '#0b0c1a';
         ctx.fillRect(0, 0, W, H);
-        if (W > 10) {
-            const g1 = ctx.createRadialGradient(W*.22, H*.28, 0, W*.22, H*.28, W*.55);
-            g1.addColorStop(0, 'rgba(140,70,200,.1)'); g1.addColorStop(1, 'transparent');
-            ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
-            const g2 = ctx.createRadialGradient(W*.8, H*.65, 0, W*.8, H*.65, W*.45);
-            g2.addColorStop(0, 'rgba(70,90,210,.08)'); g2.addColorStop(1, 'transparent');
-            ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
-            stars.forEach(s => {
-                s.a += s.da;
-                if (s.a > .92 || s.a < .05) s.da *= -1;
-                s.x += s.vx; s.y += s.vy;
-                if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
-                if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${s.col},${s.a.toFixed(2)})`;
-                ctx.fill();
-            });
-        }
-        requestAnimationFrame(draw);
+        if (W < 10 || stars.length === 0) return;
+        // nebula
+        const g1 = ctx.createRadialGradient(W*.22, H*.28, 0, W*.22, H*.28, W*.55);
+        g1.addColorStop(0, 'rgba(140,70,200,.1)'); g1.addColorStop(1, 'transparent');
+        ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+        const g2 = ctx.createRadialGradient(W*.8, H*.65, 0, W*.8, H*.65, W*.45);
+        g2.addColorStop(0, 'rgba(70,90,210,.08)'); g2.addColorStop(1, 'transparent');
+        ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+        // stars
+        stars.forEach(s => {
+            s.a += s.da;
+            if (s.a > .92 || s.a < .05) s.da *= -1;
+            s.x += s.vx; s.y += s.vy;
+            if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+            if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${s.col},${s.a.toFixed(2)})`;
+            ctx.fill();
+        });
     }
 
-    draw();
+    draw();  // เริ่ม loop — stars จะปรากฏทันทีที่ _hcmResizeStars ถูกเรียก
     setTimeout(window._hcmResizeStars, 200);
 }
 
@@ -512,8 +509,8 @@ function openPanel() {
             const ph = p.offsetHeight || 500;
             const nx = Math.max(4, Math.round((window.innerWidth  - pw) / 2));
             const ny = Math.max(4, Math.round((window.innerHeight - ph) / 2));
-                        p.style.left = nx+'px'; p.style.top = ny+'px';
-            p.style.right = 'auto'; p.style.transform = 'none';
+            p.style.left = nx+'px'; p.style.top = ny+'px';
+                        p.style.right = 'auto'; p.style.transform = 'none';
         }
         // resize stars canvas ทุกครั้ง
         if (window._hcmResizeStars) window._hcmResizeStars();
