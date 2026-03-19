@@ -201,7 +201,6 @@ function buildHTML() {
         <div class="hcm-sub" id="hcm-sub">ส่วนขยาย SillyTavern</div>
       </div>
       <div class="hcm-hdbtns">
-        <div class="hcm-hdbtn" id="hcm-drag-toggle" title="เปิดโหมดลาก">&#10003;</div>
         <div class="hcm-hdbtn" id="hcm-back" style="display:none">&#8592;</div>
         <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
       </div>
@@ -235,8 +234,8 @@ function buildHTML() {
         </div>
       </div>
       <div id="hcm-v-code" style="display:none;flex-direction:column">
-        <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
-                  <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
+              <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
+          <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
           <div class="hcm-srow">
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
@@ -250,10 +249,22 @@ function buildHTML() {
         </div>
         <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ด้วย &lt;codeN&gt;</div></div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>II</span></div><div><div class="hcm-fname">ประหยัด token</div><div class="hcm-fdesc">~450 token → ~12 token ต่อบล็อก</div></div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">ส่งกำหนดการเข้า context ก่อนโรลทุกครั้ง</div></div></div>
+          <div class="hcm-toggle-row" id="hcm-t-drag">
+            <div class="hcm-toggle-lbl">&#10021; ลากหน้าต่างได้</div>
+            <div class="hcm-tog" id="hcm-tog-drag"><span></span></div>
+          </div>
+          <div class="hcm-toggle-row hcm-tog-disabled">
+            <div class="hcm-toggle-lbl">— ระบบที่ 2</div>
+            <div class="hcm-tog"><span></span></div>
+          </div>
+          <div class="hcm-toggle-row hcm-tog-disabled">
+            <div class="hcm-toggle-lbl">— ระบบที่ 3</div>
+            <div class="hcm-tog"><span></span></div>
+          </div>
+          <div class="hcm-toggle-row hcm-tog-disabled" style="border-bottom:none">
+            <div class="hcm-toggle-lbl">— ระบบที่ 4</div>
+            <div class="hcm-tog"><span></span></div>
+          </div>
         </div>
       </div>
       <div id="hcm-v-cal" style="display:none;flex-direction:column">
@@ -351,7 +362,7 @@ function initStars() {
     document.getElementById('hcm-launcher').addEventListener('click', ()=>setTimeout(resize,80));
 }
 
-// ── Drag (toggle mode) ────────────────────────────────────────
+// ── Drag (controlled by settings toggle) ─────────────────────
 let dragMode = false;
 
 function initDrag() {
@@ -362,59 +373,46 @@ function initDrag() {
     function start(cx, cy) {
         if (!dragMode) return;
         on = true;
-        // แก้ transform ก่อน bounding rect เที่ยง
         const r = panel.getBoundingClientRect();
         ox = cx - r.left; oy = cy - r.top;
         panel.style.transition = 'none';
-        panel.style.right = 'auto';
-        panel.style.transform = 'none';
         panel.style.userSelect = 'none';
     }
     function move(cx, cy) {
         if (!on) return;
         let nx = cx - ox, ny = cy - oy;
-        const pw = panel.offsetWidth, ph = panel.offsetHeight;
-        nx = Math.max(0, Math.min(window.innerWidth  - pw, nx));
-        ny = Math.max(0, Math.min(window.innerHeight - ph, ny));
-        panel.style.left = nx + 'px';
-        panel.style.top  = ny + 'px';
+        nx = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  nx));
+        ny = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, ny));
+        panel.style.left = nx + 'px'; panel.style.top = ny + 'px';
+        panel.style.right = 'auto';   panel.style.transform = 'none';
+        panel.dataset.userMoved = '1';  // จำว่าผู้ใช้ลากไปแล้ว
     }
     function end() { on = false; panel.style.userSelect = ''; }
 
-    // mouse
-    panel.addEventListener('mousedown',   e => { e.preventDefault(); start(e.clientX, e.clientY); });
+    panel.addEventListener('mousedown',   e => { if (!dragMode) return; e.preventDefault(); start(e.clientX, e.clientY); });
     document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     document.addEventListener('mouseup',   end);
-
-    // touch — ทั้ง panel
-    panel.addEventListener('touchstart', e => {
-        const t = e.touches[0]; start(t.clientX, t.clientY);
-    }, { passive: true });
-    document.addEventListener('touchmove', e => {
-        if (!on) return;
-        e.preventDefault();
-        const t = e.touches[0]; move(t.clientX, t.clientY);
-    }, { passive: false });
-    document.addEventListener('touchend', end);
+    panel.addEventListener('touchstart',  e => { if (!dragMode) return; const t=e.touches[0]; start(t.clientX,t.clientY); }, { passive:true });
+    document.addEventListener('touchmove', e => { if (!on) return; e.preventDefault(); const t=e.touches[0]; move(t.clientX,t.clientY); }, { passive:false });
+    document.addEventListener('touchend',  end);
 }
 
 function toggleDragMode() {
     dragMode = !dragMode;
-    const btn   = document.getElementById('hcm-drag-toggle');
+    const tog   = document.getElementById('hcm-tog-drag');
     const panel = document.getElementById('hcm-panel');
-    if (btn) {
-        btn.classList.toggle('hcm-drag-on', dragMode);
-        btn.title = dragMode ? 'ปิดโหมดลาก' : 'เปิดโหมดลาก';
-    }
-    // cursor feedback
-    const book = panel && panel.querySelector('.hcm-book');
+    const book  = panel && panel.querySelector('.hcm-book');
+    if (tog) tog.classList.toggle('hcm-tog-on', dragMode);
     if (book) book.style.cursor = dragMode ? 'grab' : '';
 }
 
 function bindEvents() {
     document.getElementById('hcm-close').addEventListener('click', togglePanel);
     document.getElementById('hcm-back' ).addEventListener('click', navBack);
-    document.getElementById('hcm-drag-toggle').addEventListener('click', toggleDragMode);
+
+    // settings drag toggle
+    const togDrag = document.getElementById('hcm-tog-drag');
+    if (togDrag) togDrag.addEventListener('click', toggleDragMode);
 
     document.querySelectorAll('.hcm-bm').forEach(bm => bm.addEventListener('click', () => {
         if (!isOpen) openPanel();
@@ -462,8 +460,8 @@ function openPanel() {
     const p = document.getElementById('hcm-panel');
     p.classList.add('hcm-open');
 
-    // รอ 1 frame หลัง display:block แล้วค่อยวัด offsetWidth/Height จริง
-    if (!p.dataset.positioned) {
+    // center ทุกครั้งที่เปิด (ยกเว้นถ้าผู้ใช้ลากไปแล้ว)
+    if (!p.dataset.userMoved) {
         setTimeout(() => {
             const pw = p.offsetWidth  || 315;
             const ph = p.offsetHeight || 500;
@@ -472,11 +470,7 @@ function openPanel() {
             p.style.left      = nx + 'px';
             p.style.top       = ny + 'px';
             p.style.right     = 'auto';
-            p.style.transform = 'none';
-            p.dataset.positioned = '1';
-                        // resize canvas
-            const c = document.getElementById('hcm-sc');
-            if (c) { c.width = pw; c.height = p.offsetHeight; }
+                                p.style.transform = 'none';
         }, 30);
     }
 }
@@ -714,4 +708,3 @@ function hcmInit(){
 if(typeof jQuery!=='undefined') jQuery(hcmInit);
 else if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hcmInit);
 else hcmInit();
-            
