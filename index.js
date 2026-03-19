@@ -1,5 +1,5 @@
 /**
- * HCM Diary v2.3 — no imports, window globals only
+ * HCM Diary v2.2 — no imports, window globals only
  */
 console.log('[HCM] index.js parsing...');
 
@@ -42,7 +42,6 @@ function S() {
 
 function getChatId() { return _getCtx().chatId || 'default'; }
 
-// ── Calendar ──────────────────────────────────────────────────
 function calData() {
     const s = S(), id = getChatId();
     if (!s.calendarData[id]) s.calendarData[id] = { events: [] };
@@ -59,7 +58,8 @@ function addEvent(evt) {
 }
 
 function removeEvent(id) {
-    calData().events = calData().events.filter(e => e.id !== id);
+    const d = calData();
+    d.events = d.events.filter(e => e.id !== id);
     _saveSet(); updateInjection(); refreshCalUI();
 }
 
@@ -71,7 +71,7 @@ function updateInjection() {
     const sorted = [...evts].sort((a, b) => (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`));
     const upcoming = sorted.filter(e => (e.date || '') >= todayS);
     let text = `[ปฏิทินตัวละคร — ${todayS} ${pad(now.getHours())}:${pad(now.getMinutes())}]\n`;
-    if (!upcoming.length) text += '(ไม่มีกำหนดการที่จะถึง)';
+    if (!upcoming.length) { text += '(ไม่มีกำหนดการที่จะถึง)'; }
     else upcoming.slice(0, 15).forEach(e => {
         text += `• ${e.date === todayS ? 'วันนี้' : e.date} ${e.time || '--:--'} | ${e.person || 'ทุกคน'} | ${e.activity || ''}`;
         if (e.details) text += ` — ${e.details}`;
@@ -81,7 +81,6 @@ function updateInjection() {
     _setPrompt(INJ_KEY, text, 1, 0);
 }
 
-// ── Code ──────────────────────────────────────────────────────
 let gCnt = 0;
 function codeData() {
     const s = S(), id = getChatId();
@@ -102,7 +101,6 @@ function removeBlock(id) {
     _saveSet(); refreshCodeUI();
 }
 
-// ── Message processing ────────────────────────────────────────
 function processMessage(messageId) {
     const ctx = _getCtx();
     if (!ctx.chat || !ctx.chat[messageId]) return;
@@ -152,20 +150,19 @@ function parseAttrs(str) {
     return a;
 }
 
-// ── Panel state ───────────────────────────────────────────────
 let curSection = 'toc';
 let calView = { year: new Date().getFullYear(), month: new Date().getMonth() };
 let selDate = null, curPopId = null, isOpen = false;
 
-// ── Build HTML ────────────────────────────────────────────────
 function createPanel() {
     if (document.getElementById('hcm-launcher')) return;
-
     const lnc = document.createElement('div');
     lnc.id = 'hcm-launcher';
     lnc.innerHTML = `<div class="hcm-lt-gem"><span>H</span></div>
+      <div class="hcm-lt-lbl">HCM</div>
       <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>`;
     lnc.addEventListener('click', togglePanel);
+    lnc.addEventListener('touchend', e => { e.preventDefault(); togglePanel(); });
     document.body.appendChild(lnc);
 
     const panel = document.createElement('div');
@@ -174,11 +171,10 @@ function createPanel() {
     document.body.appendChild(panel);
 
     initStars();
-    initDrag();
     bindEvents();
     startClock();
     refreshAllUI();
-    console.log('[HCM] ✓ Ready');
+    console.log('[HCM] Panel created OK');
 }
 
 function buildHTML() {
@@ -186,25 +182,19 @@ function buildHTML() {
     return `
 <canvas id="hcm-sc"></canvas>
 <div class="hcm-frame">
-  <!-- bookmarks อยู่หลัง book (z-index ต่ำกว่า) -->
+  <div class="hcm-rings">${'<div class="hcm-ring"></div>'.repeat(8)}</div>
   <div class="hcm-bmarks">
     <div class="hcm-bm" data-bm="code">โค้ด</div>
     <div class="hcm-bm" data-bm="cal">ปฏิทิน</div>
     <div class="hcm-bm" data-bm="toc">เมนู</div>
   </div>
   <div class="hcm-book">
-    <div class="hcm-band hcm-top"></div>
-    <!-- top bar = drag handle -->
-    <div class="hcm-sb hcm-drag-zone" id="hcm-drag-top">
-      <div class="hcm-sb-l">
-        <div class="hcm-sb-dot"></div>
-        <span id="hcm-clock">--:--:--</span>
-        <span class="hcm-sep">·</span>
-        <span id="hcm-chatname">SillyTavern</span>
-      </div>
+    <div class="hcm-band hcm-top hcm-drag-zone"></div>
+    <div class="hcm-sb hcm-drag-zone" id="hcm-drag-handle">
+      <div class="hcm-sb-l"><div class="hcm-sb-dot"></div><span id="hcm-clock">--:--:--</span><span class="hcm-sep">·</span><span id="hcm-chatname">SillyTavern</span></div>
       <div class="hcm-sb-r" id="hcm-charname">—</div>
     </div>
-    <div class="hcm-hd">
+    <div class="hcm-hd hcm-drag-zone">
       <div class="hcm-hdm">
         <span class="hcm-eyebrow" id="hcm-eyebrow">HCM Diary</span>
         <div class="hcm-title" id="hcm-title">สารบัญระบบ</div>
@@ -215,10 +205,7 @@ function buildHTML() {
         <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
       </div>
     </div>
-    <div class="hcm-drow">
-      <span class="hcm-dlbl">Date</span>
-      <div class="hcm-dval" id="hcm-date">—</div>
-    </div>
+    <div class="hcm-drow"><span class="hcm-dlbl">Date</span><div class="hcm-dval" id="hcm-date">—</div></div>
     <div class="hcm-stabs" id="hcm-tabs-code">
       <div class="hcm-stab hcm-on" data-sv="code">โค้ด <span class="hcm-tbadge" id="hcm-cnt">0</span></div>
       <div class="hcm-stab" data-sv="settings">ตั้งค่า</div>
@@ -228,58 +215,47 @@ function buildHTML() {
       <div class="hcm-stab" data-cv="list">รายการ</div>
       <div class="hcm-stab" data-cv="add">+ เพิ่ม</div>
     </div>
-
     <div class="hcm-body">
-
-      <!-- TOC — ไม่มี note card -->
       <div id="hcm-v-toc">
-        <div class="hcm-toc-hd">
-          <span class="hcm-toc-lbl">NOTE</span>
-          <span class="hcm-toc-yr">ระบบ &amp; เครื่องมือ</span>
-        </div>
+        <div class="hcm-toc-hd"><span class="hcm-toc-lbl">NOTE</span><span class="hcm-toc-yr">ระบบ &amp; เครื่องมือ</span></div>
         <div class="hcm-trow hcm-can" data-nav="code">
           <div class="hcm-tl"><div class="hcm-tbig">C</div><div class="hcm-tabb">CODE</div></div>
           <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
-          <div class="hcm-tarrow">&#8250;</div>
+          <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
         </div>
-        <div class="hcm-trow hcm-can" data-nav="cal">
-          <div class="hcm-tl"><div class="hcm-tbig">K</div><div class="hcm-tabb">CAL</div></div>
-          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">ปฏิทินตัวละคร</div><div class="hcm-tdesc">นัดหมาย · กิจกรรม · inject อัตโนมัติ</div></div>
-          <div class="hcm-tarrow">&#8250;</div>
-        </div>
-        <div class="hcm-trow hcm-locked">
-          <div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div>
-          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
-        </div>
-        <div class="hcm-trow hcm-locked" style="border-bottom:none">
-          <div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div>
-          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 03</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
+        <div class="hcm-note-card">
+          <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
+          <div class="hcm-nc-body">AI ใส่ tag ในบทโรล → extension จับ → ลบ → บันทึก → inject ก่อนโรลถัดไป<br><br>
+                    <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
+          symbols: heart · star · diamond · note · cross · task · general</div>
         </div>
       </div>
-
-      <!-- CODE — ไม่มี export -->
-      <div id="hcm-v-code" style="display:none">
+      <div id="hcm-v-code" style="display:none;flex-direction:column">
         <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
-          <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน</span></div>
+          <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
           <div class="hcm-srow">
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
             <div class="hcm-sc2"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
           </div>
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
           <div id="hcm-codelist"></div>
-                    <button class="hcm-btns2" id="hcm-clear-btn" style="width:100%;margin-top:6px">&#215; ล้างทั้งหมด</button>
+          <div class="hcm-btns">
+            <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
+            <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export</button>
+          </div>
         </div>
         <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
           <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ด้วย &lt;codeN&gt; ใน context</div></div></div>
+          <div class="hcm-feat"><div class="hcm-fn"><span>I</span></div><div><div class="hcm-fname">ตรวจจับ HTML block</div><div class="hcm-fdesc">จับ \`\`\`html...\`\`\` จาก AI แทนที่ด้วย &lt;codeN&gt;</div></div></div>
           <div class="hcm-feat"><div class="hcm-fn"><span>II</span></div><div><div class="hcm-fname">ประหยัด token</div><div class="hcm-fdesc">~450 token → ~12 token ต่อบล็อก</div></div></div>
           <div class="hcm-feat"><div class="hcm-fn"><span>III</span></div><div><div class="hcm-fname">จับ [CAL:...] tag</div><div class="hcm-fdesc">บันทึกปฏิทินอัตโนมัติ ลบออกจากข้อความ</div></div></div>
-          <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">โมเดลอ่านกำหนดการก่อนตอบทุกครั้ง</div></div></div>
+          <div class="hcm-feat"><div class="hcm-fn"><span>IV</span></div><div><div class="hcm-fname">Inject ปฏิทิน</div><div class="hcm-fdesc">ส่งกำหนดการเข้า context ก่อนโรลทุกครั้ง</div></div></div>
         </div>
       </div>
-
-      <!-- CALENDAR -->
-      <div id="hcm-v-cal" style="display:none">
+      <div id="hcm-v-cal" style="display:none;flex-direction:column">
         <div id="hcm-calv-month">
           <div class="hcm-cal-nav">
             <button class="hcm-cal-nb" id="hcm-cal-prev">&#8249;</button>
@@ -288,7 +264,7 @@ function buildHTML() {
           </div>
           <div class="hcm-cal-pf">
             <span class="hcm-cal-pfl">บุคคล</span>
-            <select id="hcm-pfilter" class="hcm-psel"><option value="">ทุกคน</option></select>
+            <select id="hcm-pfilter" style="font-size:9px;flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.92);padding:2px 5px;outline:none"><option value="">ทุกคน</option></select>
           </div>
           <div class="hcm-cal-dows"><div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div></div>
           <div class="hcm-cal-grid" id="hcm-cal-grid"></div>
@@ -310,17 +286,11 @@ function buildHTML() {
           <button class="hcm-btnp" id="hcm-add-save" style="margin-top:4px;width:100%">&#43; บันทึก</button>
         </div>
       </div>
-
-    </div><!-- /body -->
-
-    <!-- bottom drag bar -->
-    <div class="hcm-hind hcm-drag-zone" id="hcm-drag-bot">
-      <div class="hcm-hbar"></div>
     </div>
-  </div><!-- /book -->
-</div><!-- /frame -->
-
-<!-- popup -->
+    <div class="hcm-band hcm-bot"></div>
+    <div class="hcm-hind"><div class="hcm-hbar"></div></div>
+  </div>
+</div>
 <div id="hcm-pop">
   <div class="hcm-ps">
     <div class="hcm-ph">
@@ -333,159 +303,98 @@ function buildHTML() {
       <div class="hcm-ptt" data-pt="prev">พรีวิว</div>
     </div>
     <div class="hcm-pb">
-      <div id="hcm-ptsrc"><pre id="hcm-psrc"></pre></div>
-      <div id="hcm-ptprev" style="display:none"><div id="hcm-pprev"></div></div>
+      <div id="hcm-ptsrc"><pre id="hcm-psrc" style="font-family:'Courier New',monospace;font-size:9px;color:rgba(255,255,255,.88);white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);padding:10px"></pre></div>
+      <div id="hcm-ptprev" style="display:none"><div id="hcm-pprev" style="background:white;padding:14px;min-height:60px"></div></div>
     </div>
   </div>
 </div>`;
 }
 
-// ── Stars ─────────────────────────────────────────────────────
 function initStars() {
     const canvas = document.getElementById('hcm-sc');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let W = 0, H = 0, stars = [], animId = null;
-
-    function buildStars(w, h) {
-        stars = [];
-        const n = Math.floor(w * h / 2600);
-        for (let i = 0; i < n; i++) {
-            const s = Math.random();
-            stars.push({
-                x: Math.random() * w, y: Math.random() * h,
-                r: s < .72 ? .4 : s < .9 ? .75 : 1.15,
-                a: Math.random(),
-                // ค่าเดิมช้าเกิน (.0003) เปลี่ยนเป็น .004-.012 ให้ดาวกระพริบเห็นได้ชัด
-                da: (.004 + Math.random() * .008) * (Math.random() < .5 ? 1 : -1),
-                col: Math.random() < .65 ? '255,255,255' : Math.random() < .5 ? '200,175,255' : '165,205,255'
-            });
-        }
-    }
-
+    let W, H, stars = [];
     function resize() {
         const panel = document.getElementById('hcm-panel');
-        if (!panel) return;
-        const nw = panel.offsetWidth || 315;
-        const nh = panel.offsetHeight || 500;
-        if (nw !== W || nh !== H) {
-            W = canvas.width  = nw;
-            H = canvas.height = nh;
-            buildStars(W, H);
+        W = canvas.width  = panel.offsetWidth  || 315;
+        H = canvas.height = panel.offsetHeight || 600;
+        stars = [];
+        const n = Math.floor(W * H / 2800);
+        for (let i = 0; i < n; i++) {
+            const s = Math.random();
+            stars.push({ x: Math.random()*W, y: Math.random()*H,
+                r: s<.72?.38:s<.9?.7:1.1,
+                a: Math.random(), da:(.0002+Math.random()*.0005)*(Math.random()<.5?1:-1),
+                col: Math.random()<.65?'255,255,255':Math.random()<.5?'200,175,255':'165,205,255' });
         }
     }
-
     function draw() {
-        animId = requestAnimationFrame(draw);
-        // ดาวต้องขยับเสมอ ไม่หยุดแม้ panel ปิด (ไม่งั้นตอนเปิดดาวไม่ไหว)
-        if (W === 0 || H === 0) return;
-
-        // check size changed (panel อาจ resize)
-        const panel = document.getElementById('hcm-panel');
-        if (panel && panel.classList.contains('hcm-open')) {
-            if (panel.offsetWidth !== W || panel.offsetHeight !== H) resize();
-        }
-
-        ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#0b0c1a';
-        ctx.fillRect(0, 0, W, H);
-
-        // nebula glows
-        const paints = [
-            { x: W*.22, y: H*.28, r: W*.55, c: 'rgba(140,70,200,.07)' },
-            { x: W*.8,  y: H*.65, r: W*.45, c: 'rgba(70,90,210,.06)' },
-            { x: W*.5,  y: H*.05, r: W*.4,  c: 'rgba(200,90,140,.04)' },
-        ];
-        paints.forEach(p => {
-            const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-            g.addColorStop(0, p.c); g.addColorStop(1, 'transparent');
-            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        if (!document.getElementById('hcm-sc')) return;
+        ctx.clearRect(0,0,W,H);
+        ctx.fillStyle='#0b0c1a'; ctx.fillRect(0,0,W,H);
+        const g1=ctx.createRadialGradient(W*.22,H*.28,0,W*.22,H*.28,W*.55);
+        g1.addColorStop(0,'rgba(140,70,200,.07)'); g1.addColorStop(1,'transparent');
+        ctx.fillStyle=g1; ctx.fillRect(0,0,W,H);
+        const g2=ctx.createRadialGradient(W*.8,H*.65,0,W*.8,H*.65,W*.45);
+        g2.addColorStop(0,'rgba(70,90,210,.06)'); g2.addColorStop(1,'transparent');
+        ctx.fillStyle=g2; ctx.fillRect(0,0,W,H);
+        stars.forEach(s=>{
+            s.a+=s.da; if(s.a>1||s.a<.04)s.da*=-1;
+            ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+            ctx.fillStyle=`rgba(${s.col},${s.a.toFixed(2)})`; ctx.fill();
         });
-
-        stars.forEach(s => {
-            s.a += s.da;
-            if (s.a > 1 || s.a < .04) s.da *= -1;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${s.col},${Math.max(.04, Math.min(1, s.a)).toFixed(2)})`;
-            ctx.fill();
-        });
+        requestAnimationFrame(draw);
     }
-
-    resize();
-    draw(); // starts loop
+    resize(); draw();
+    document.getElementById('hcm-launcher').addEventListener('click', ()=>setTimeout(resize,80));
 }
 
-// ── Drag (pointer events — reliable on mobile + desktop) ──────
 function initDrag() {
     const panel = document.getElementById('hcm-panel');
     if (!panel) return;
 
-    // Full-screen transparent overlay absorbs all pointer events during drag
-    const ovl = document.createElement('div');
-    ovl.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;touch-action:none;cursor:grabbing';
-    document.body.appendChild(ovl);
+    // ลากได้จากทุก element ที่มี class hcm-drag-zone
+    const zones = panel.querySelectorAll('.hcm-drag-zone');
+    let ox=0, oy=0, on=false;
 
-    let active = false, ox = 0, oy = 0;
-
-    function startDrag(cx, cy) {
+    function start(cx, cy) {
+        on = true;
         const r = panel.getBoundingClientRect();
-        ox = cx - r.left;
-        oy = cy - r.top;
+        ox = cx - r.left; oy = cy - r.top;
         panel.style.transition = 'none';
-        panel.style.transform  = 'none';
-        // ensure position is set as left/top not right/transform
-        panel.style.left = r.left + 'px';
-        panel.style.top  = r.top  + 'px';
         panel.style.right = 'auto';
-        ovl.style.display = 'block';
-        active = true;
+        panel.style.transform = 'none';
+        panel.style.userSelect = 'none';
     }
-
-    function moveDrag(cx, cy) {
-        if (!active) return;
-        const maxX = window.innerWidth  - panel.offsetWidth;
-        const maxY = window.innerHeight - panel.offsetHeight;
-        panel.style.left = Math.max(0, Math.min(maxX, cx - ox)) + 'px';
-        panel.style.top  = Math.max(0, Math.min(maxY, cy - oy)) + 'px';
+    function move(cx, cy) {
+        if (!on) return;
+        let nx = cx - ox, ny = cy - oy;
+        const pw = panel.offsetWidth, ph = panel.offsetHeight;
+        nx = Math.max(0, Math.min(window.innerWidth  - pw, nx));
+        ny = Math.max(0, Math.min(window.innerHeight - ph, ny));
+        panel.style.left = nx + 'px';
+        panel.style.top  = ny + 'px';
     }
+    function end() { on = false; panel.style.userSelect = ''; }
 
-    function endDrag() {
-        if (!active) return;
-        active = false;
-        panel.style.transition = '';
-        ovl.style.display = 'none';
-    }
-
-    // Attach to both top bar AND bottom bar
-    ['hcm-drag-top', 'hcm-drag-bot'].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-
-        // Mouse
-        el.addEventListener('mousedown', e => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            startDrag(e.clientX, e.clientY);
-        });
-
-        // Touch (passive:false lets us preventDefault)
-        el.addEventListener('touchstart', e => {
-            e.preventDefault();
-            startDrag(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
+    zones.forEach(h => {
+        h.addEventListener('mousedown',  e => { e.preventDefault(); start(e.clientX, e.clientY); });
+        h.addEventListener('touchstart', e => {
+            const t = e.touches[0]; start(t.clientX, t.clientY);
+        }, { passive: true });
     });
 
-    // Move + end on overlay (catches all movement even if finger leaves handle)
-    ovl.addEventListener('mousemove',   e => moveDrag(e.clientX, e.clientY));
-    ovl.addEventListener('mouseup',     endDrag);
-    ovl.addEventListener('mouseleave',  endDrag);
-    ovl.addEventListener('touchmove',   e => { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
-    ovl.addEventListener('touchend',    endDrag);
-    ovl.addEventListener('touchcancel', endDrag);
+    document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+    document.addEventListener('mouseup',   end);
+    document.addEventListener('touchmove', e => {
+        if (!on) return;
+        e.preventDefault();
+        const t = e.touches[0]; move(t.clientX, t.clientY);
+    }, { passive: false });
+    document.addEventListener('touchend', end);
 }
 
-// ── Events ────────────────────────────────────────────────────
 function bindEvents() {
     document.getElementById('hcm-close').addEventListener('click', togglePanel);
     document.getElementById('hcm-back' ).addEventListener('click', navBack);
@@ -502,306 +411,284 @@ function bindEvents() {
     document.querySelectorAll('#hcm-tabs-cal .hcm-stab').forEach(t =>
         t.addEventListener('click', () => {
             switchSub('cal', t.dataset.cv);
-            if (t.dataset.cv === 'month') renderGrid();
-            if (t.dataset.cv === 'list')  renderList();
+            if (t.dataset.cv==='month') renderGrid();
+            if (t.dataset.cv==='list')  renderList();
         }));
 
-    document.getElementById('hcm-cal-prev').addEventListener('click', () => { calView.month--; if (calView.month < 0) { calView.month = 11; calView.year--; } renderGrid(); });
-    document.getElementById('hcm-cal-next').addEventListener('click', () => { calView.month++; if (calView.month > 11) { calView.month = 0; calView.year++; } renderGrid(); });
+    document.getElementById('hcm-cal-prev').addEventListener('click', ()=>{ calView.month--; if(calView.month<0){calView.month=11;calView.year--;} renderGrid(); });
+    document.getElementById('hcm-cal-next').addEventListener('click', ()=>{ calView.month++; if(calView.month>11){calView.month=0;calView.year++;} renderGrid(); });
     document.getElementById('hcm-pfilter').addEventListener('change', renderGrid);
-    document.getElementById('hcm-clear-btn').addEventListener('click', () => { codeData().blocks = []; _saveSet(); refreshCodeUI(); });
-    document.getElementById('hcm-add-save').addEventListener('click', saveEvent);
+    document.getElementById('hcm-clear-btn' ).addEventListener('click', ()=>{ codeData().blocks=[]; _saveSet(); refreshCodeUI(); });
+    document.getElementById('hcm-export-btn').addEventListener('click', exportJSON);
+    document.getElementById('hcm-add-save'  ).addEventListener('click', saveEvent);
     document.getElementById('hcm-a-date').value = dStr(new Date());
 
     document.getElementById('hcm-pop-close').addEventListener('click', closePop);
-    document.getElementById('hcm-pop').addEventListener('click', e => { if (e.target.id === 'hcm-pop') closePop(); });
-    document.getElementById('hcm-pc-btn').addEventListener('click', () => {
-        const b = codeData().blocks.find(x => x.id === curPopId); if (!b) return;
-        navigator.clipboard.writeText(b.html).catch(() => {});
-        const btn = document.getElementById('hcm-pc-btn');
-        btn.textContent = 'คัดลอกแล้ว'; setTimeout(() => btn.textContent = 'คัดลอก', 1400);
+    document.getElementById('hcm-pop').addEventListener('click', e=>{ if(e.target.id==='hcm-pop') closePop(); });
+    document.getElementById('hcm-pc-btn').addEventListener('click', ()=>{
+        const b=codeData().blocks.find(x=>x.id===curPopId); if(!b) return;
+        navigator.clipboard.writeText(b.html).catch(()=>{});
+        const btn=document.getElementById('hcm-pc-btn');
+        btn.textContent='คัดลอกแล้ว'; setTimeout(()=>btn.textContent='คัดลอก',1400);
     });
-    document.querySelectorAll('.hcm-ptt').forEach(t => t.addEventListener('click', () => {
-        document.querySelectorAll('.hcm-ptt').forEach(x => x.classList.remove('hcm-on')); t.classList.add('hcm-on');
-        document.getElementById('hcm-ptsrc' ).style.display = t.dataset.pt === 'src'  ? 'block' : 'none';
-        document.getElementById('hcm-ptprev').style.display = t.dataset.pt === 'prev' ? 'block' : 'none';
+    document.querySelectorAll('.hcm-ptt').forEach(t=>t.addEventListener('click',()=>{
+        document.querySelectorAll('.hcm-ptt').forEach(x=>x.classList.remove('hcm-on')); t.classList.add('hcm-on');
+        document.getElementById('hcm-ptsrc' ).style.display=t.dataset.pt==='src' ?'block':'none';
+        document.getElementById('hcm-ptprev').style.display=t.dataset.pt==='prev'?'block':'none';
     }));
+
+    initDrag();
 }
 
-// ── Navigation ────────────────────────────────────────────────
 function openPanel() {
     isOpen = true;
     const p = document.getElementById('hcm-panel');
-    if (!p.style.left || p.style.left === '-400px') {
-        // center on first open
-        p.style.display = 'block';
-        const pw = p.offsetWidth  || 315;
-                                   const ph = p.offsetHeight || 500;
-        p.style.left = Math.max(4, Math.round((window.innerWidth  - pw) / 2)) + 'px';
-        p.style.top  = Math.max(4, Math.round((window.innerHeight - ph) / 2)) + 'px';
-        p.style.transform = 'none';
+    p.classList.add('hcm-open');
+    if (!p.style.left) {
+        const pw = p.offsetWidth || 315;
+        p.style.left = Math.max(4, Math.round((window.innerWidth - pw) / 2)) + 'px';
+        p.style.top  = '50%';
+        p.style.transform = 'translateY(-50%)';
         p.style.right = 'auto';
     }
-    p.classList.add('hcm-open');
+    // resize canvas หลังเปิด
+    setTimeout(()=>{
+        const c=document.getElementById('hcm-sc');
+        if(c){ c.width=p.offsetWidth; c.height=p.offsetHeight; }
+    }, 60);
 }
-function closePanel()  { isOpen = false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
+function closePanel() { isOpen=false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
 function togglePanel() { isOpen ? closePanel() : openPanel(); }
 
 function setActiveBm(s) {
-    document.querySelectorAll('.hcm-bm').forEach(b => b.classList.toggle('hcm-active', b.dataset.bm === s));
+    document.querySelectorAll('.hcm-bm').forEach(b=>b.classList.toggle('hcm-active',b.dataset.bm===s));
 }
 
 function openSec(s) {
-    curSection = s;
-    ['toc','code','cal'].forEach(v => { const e = document.getElementById(`hcm-v-${v}`); if (e) e.style.display = 'none'; });
-    document.getElementById('hcm-tabs-code').style.display = 'none';
-    document.getElementById('hcm-tabs-cal' ).style.display = 'none';
-    document.getElementById('hcm-back').style.display = 'flex';
+    curSection=s;
+    ['toc','code','cal'].forEach(v=>{ const e=document.getElementById(`hcm-v-${v}`); if(e) e.style.display='none'; });
+    document.getElementById('hcm-tabs-code').style.display='none';
+    document.getElementById('hcm-tabs-cal' ).style.display='none';
+    document.getElementById('hcm-back').style.display='flex';
     setActiveBm(s);
-    if (s === 'code') {
-        document.getElementById('hcm-v-code').style.display = 'flex';
-        document.getElementById('hcm-v-code').style.flexDirection = 'column';
-        document.getElementById('hcm-tabs-code').style.display = 'flex';
-        document.getElementById('hcm-sv-code').style.display = 'block';
-        setHdr('ระบบที่ 01', 'ตัวจัดการโค้ด', 'HTML Block Store');
+    if(s==='code'){
+        const vc=document.getElementById('hcm-v-code');
+        vc.style.display='flex'; vc.style.flexDirection='column';
+        document.getElementById('hcm-tabs-code').style.display='flex';
+        document.getElementById('hcm-sv-code').style.display='block';
+        setHdr('ระบบที่ 01','ตัวจัดการโค้ด','HTML Block Store');
         refreshCodeUI();
     } else {
-        document.getElementById('hcm-v-cal').style.display = 'flex';
-        document.getElementById('hcm-v-cal').style.flexDirection = 'column';
-        document.getElementById('hcm-tabs-cal').style.display = 'flex';
-        document.getElementById('hcm-calv-month').style.display = 'block';
-        setHdr('ระบบที่ 02', 'ปฏิทินตัวละคร', 'กิจกรรมในโรล');
+        const vc=document.getElementById('hcm-v-cal');
+        vc.style.display='flex'; vc.style.flexDirection='column';
+        document.getElementById('hcm-tabs-cal').style.display='flex';
+        document.getElementById('hcm-calv-month').style.display='block';
+        setHdr('ระบบที่ 02','ปฏิทินตัวละคร','กิจกรรมในโรล');
         buildPF(); renderGrid(); renderList();
     }
 }
 
 function navBack() {
-    curSection = 'toc';
-    document.getElementById('hcm-v-code').style.display = 'none';
-    document.getElementById('hcm-v-cal' ).style.display = 'none';
-    document.getElementById('hcm-v-toc' ).style.display = 'block';
-    document.getElementById('hcm-tabs-code').style.display = 'none';
-    document.getElementById('hcm-tabs-cal' ).style.display = 'none';
-    document.getElementById('hcm-back').style.display = 'none';
-    setHdr('HCM Diary', 'สารบัญระบบ', 'ส่วนขยาย SillyTavern');
+    curSection='toc';
+    document.getElementById('hcm-v-code').style.display='none';
+    document.getElementById('hcm-v-cal' ).style.display='none';
+    document.getElementById('hcm-v-toc' ).style.display='block';
+    document.getElementById('hcm-tabs-code').style.display='none';
+    document.getElementById('hcm-tabs-cal' ).style.display='none';
+    document.getElementById('hcm-back').style.display='none';
+    setHdr('HCM Diary','สารบัญระบบ','ส่วนขยาย SillyTavern');
     setActiveBm('toc');
 }
 
-function switchSub(sec, name) {
-    const tid  = sec === 'code' ? 'hcm-tabs-code' : 'hcm-tabs-cal';
-    const attr = sec === 'code' ? 'sv' : 'cv';
-    document.querySelectorAll(`#${tid} .hcm-stab`).forEach(x => x.classList.remove('hcm-on'));
-    const t = document.querySelector(`#${tid} .hcm-stab[data-${attr}="${name}"]`);
-    if (t) t.classList.add('hcm-on');
-    if (sec === 'code') {
-        ['code','settings'].forEach(k => { const e = document.getElementById(`hcm-sv-${k}`); if (e) e.style.display = 'none'; });
-        const v = document.getElementById(`hcm-sv-${name}`); if (v) v.style.display = 'block';
+function switchSub(sec,name){
+    const tabsId=sec==='code'?'hcm-tabs-code':'hcm-tabs-cal';
+    const attr  =sec==='code'?'sv':'cv';
+    document.querySelectorAll(`#${tabsId} .hcm-stab`).forEach(x=>x.classList.remove('hcm-on'));
+    const t=document.querySelector(`#${tabsId} .hcm-stab[data-${attr}="${name}"]`);
+    if(t) t.classList.add('hcm-on');
+    if(sec==='code'){
+        ['code','settings'].forEach(k=>{ const e=document.getElementById(`hcm-sv-${k}`); if(e) e.style.display='none'; });
+        const v=document.getElementById(`hcm-sv-${name}`); if(v) v.style.display='block';
     } else {
-        ['month','list','add'].forEach(k => { const e = document.getElementById(`hcm-calv-${k}`); if (e) e.style.display = 'none'; });
-        const v = document.getElementById(`hcm-calv-${name}`); if (v) v.style.display = 'block';
+        ['month','list','add'].forEach(k=>{ const e=document.getElementById(`hcm-calv-${k}`); if(e) e.style.display='none'; });
+        const v=document.getElementById(`hcm-calv-${name}`); if(v) v.style.display='block';
     }
 }
 
-// ── Calendar UI ───────────────────────────────────────────────
-const TH_M = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const TH_S = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const TH_M=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const TH_S=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-function renderGrid() {
-    const { year, month } = calView;
-    document.getElementById('hcm-cal-lbl').textContent = `${TH_M[month]} ${year + 543}`;
-    const pf = document.getElementById('hcm-pfilter').value;
-    const evts = calData().events.filter(e => !pf || e.person === pf);
-    const first = new Date(year, month, 1).getDay();
-    const last  = new Date(year, month + 1, 0).getDate();
-    const ts    = dStr(new Date());
-    const g = document.getElementById('hcm-cal-grid'); g.innerHTML = '';
-    for (let i = 0; i < first; i++) { const c = document.createElement('div'); c.className = 'hcm-cd hcm-emp'; g.appendChild(c); }
-    for (let d = 1; d <= last; d++) {
-        const ds = `${year}-${pad(month+1)}-${pad(d)}`;
-        const de = evts.filter(e => e.date === ds);
-        const c  = document.createElement('div');
-        c.className = 'hcm-cd' + (ds === ts ? ' hcm-tdy' : '') + (ds === selDate ? ' hcm-sel' : '');
-        c.innerHTML = `<div class="hcm-dn">${d}</div>`;
-        if (de.length) {
-            const ss = document.createElement('div'); ss.className = 'hcm-syms';
-            de.slice(0, 3).forEach(ev => {
-                const sy = SYM[ev.symbol] || SYM.general;
-                const sp = document.createElement('span');
-                sp.className = 'hcm-sym'; sp.style.color = sy.col; sp.textContent = sy.c;
+function renderGrid(){
+    const{year,month}=calView;
+    document.getElementById('hcm-cal-lbl').textContent=`${TH_M[month]} ${year+543}`;
+    const pf=document.getElementById('hcm-pfilter').value;
+    const evts=calData().events.filter(e=>!pf||e.person===pf);
+    const first=new Date(year,month,1).getDay();
+    const last =new Date(year,month+1,0).getDate();
+    const todayS=dStr(new Date());
+    const g=document.getElementById('hcm-cal-grid'); g.innerHTML='';
+    for(let i=0;i<first;i++){ const c=document.createElement('div'); c.className='hcm-cd hcm-emp'; g.appendChild(c); }
+    for(let d=1;d<=last;d++){
+        const ds=`${year}-${pad(month+1)}-${pad(d)}`;
+        const de=evts.filter(e=>e.date===ds);
+        const c=document.createElement('div');
+        c.className='hcm-cd'+(ds===todayS?' hcm-tdy':'')+(ds===selDate?' hcm-sel':'');
+        c.innerHTML=`<div class="hcm-dn">${d}</div>`;
+        if(de.length){
+            const ss=document.createElement('div'); ss.className='hcm-syms';
+            de.slice(0,3).forEach(ev=>{
+                const sy=SYM[ev.symbol]||SYM.general;
+                const sp=document.createElement('span');
+                sp.className='hcm-sym'; sp.style.color=sy.col; sp.textContent=sy.c;
                 ss.appendChild(sp);
             }); c.appendChild(ss);
         }
-        c.addEventListener('click', () => showDay(ds, de)); g.appendChild(c);
+        c.addEventListener('click',()=>showDay(ds,de)); g.appendChild(c);
     }
     renderLeg();
 }
 
-function renderLeg() {
-    document.getElementById('hcm-cal-leg').innerHTML = Object.values(SYM).map(v =>
+function renderLeg(){
+    document.getElementById('hcm-cal-leg').innerHTML=Object.values(SYM).map(v=>
         `<div class="hcm-leg-it"><span class="hcm-sym" style="color:${v.col}">${v.c}</span><span>${v.l}</span></div>`).join('');
 }
 
-function showDay(ds, evts) {
-    selDate = ds; renderGrid();
-    const det = document.getElementById('hcm-cal-det');
-    if (!evts.length) { det.style.display = 'none'; return; }
-    det.style.display = 'block';
-    const [y,m,d] = ds.split('-');
-    det.innerHTML = `<div class="hcm-det-hd"><div class="hcm-det-date">${parseInt(d)} ${TH_S[parseInt(m)-1]} ${parseInt(y)+543}</div><div class="hcm-det-cnt">${evts.length} กิจกรรม</div></div>`
-        + evts.map(ev => {
-            const sy = SYM[ev.symbol] || SYM.general;
-            return `<div class="hcm-det-row"><div class="hcm-det-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-det-body"><div class="hcm-det-act">${ev.activity}</div><div class="hcm-det-meta"><span>${ev.person||'ทุกคน'}</span><span>${ev.time||'--:--'}</span></div>${ev.details?`<div class="hcm-det-note">${ev.details}</div>`:''}</div><div class="hcm-det-del" data-id="${ev.id}">&#215;</div></div>`;
+function showDay(ds,evts){
+    selDate=ds; renderGrid();
+    const det=document.getElementById('hcm-cal-det');
+    if(!evts.length){ det.style.display='none'; return; }
+    det.style.display='block';
+    const[y,m,d]=ds.split('-');
+    det.innerHTML=`<div class="hcm-det-hd"><div class="hcm-det-date">${parseInt(d)} ${TH_S[parseInt(m)-1]} ${parseInt(y)+543}</div><div class="hcm-det-cnt">${evts.length} กิจกรรม</div></div>`
+        +evts.map(ev=>{ const sy=SYM[ev.symbol]||SYM.general;
+            return`<div class="hcm-det-row"><div class="hcm-det-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-det-body"><div class="hcm-det-act">${ev.activity}</div><div class="hcm-det-meta"><span>${ev.person||'ทุกคน'}</span><span>${ev.time||'--:--'}</span></div>${ev.details?`<div class="hcm-det-note">${ev.details}</div>`:''}</div><div class="hcm-det-del" data-id="${ev.id}">&#215;</div></div>`;
         }).join('');
-    det.querySelectorAll('.hcm-det-del').forEach(b =>
-        b.addEventListener('click', () => { removeEvent(parseFloat(b.dataset.id)); det.style.display = 'none'; selDate = null; }));
+    det.querySelectorAll('.hcm-det-del').forEach(b=>b.addEventListener('click',()=>{ removeEvent(parseFloat(b.dataset.id)); det.style.display='none'; selDate=null; }));
 }
 
-function renderList() {
-    const el = document.getElementById('hcm-ev-list'); if (!el) return;
-    const s = [...calData().events].sort((a, b) => (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`));
-    const ts = dStr(new Date());
-    if (!s.length) { el.innerHTML = '<div class="hcm-empty"><p>ยังไม่มีกำหนดการ</p></div>'; return; }
-    el.innerHTML = s.map(ev => {
-        const sy = SYM[ev.symbol] || SYM.general;
-        return `<div class="hcm-lev${ev.date < ts ? ' hcm-past' : ''}"><div class="hcm-lev-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-lev-body"><div class="hcm-lev-act">${ev.activity}</div><div class="hcm-lev-meta">${ev.date} ${ev.time} · ${ev.person||'ทุกคน'}</div>${ev.details?`<div class="hcm-lev-det">${ev.details}</div>`:''}</div><div class="hcm-lev-del" data-id="${ev.id}">&#215;</div></div>`;
+function renderList(){
+    const el=document.getElementById('hcm-ev-list'); if(!el) return;
+    const s=[...calData().events].sort((a,b)=>(`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`));
+    const ts=dStr(new Date());
+    if(!s.length){ el.innerHTML='<div class="hcm-empty"><p>ยังไม่มีกำหนดการ</p></div>'; return; }
+    el.innerHTML=s.map(ev=>{ const sy=SYM[ev.symbol]||SYM.general;
+        return`<div class="hcm-lev${ev.date<ts?' hcm-past':''}"><div class="hcm-lev-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-lev-body"><div class="hcm-lev-act">${ev.activity}</div><div class="hcm-lev-meta">${ev.date} ${ev.time}·${ev.person||'ทุกคน'}</div>${ev.details?`<div class="hcm-lev-det">${ev.details}</div>`:''}</div><div class="hcm-lev-del" data-id="${ev.id}">&#215;</div></div>`;
     }).join('');
-    el.querySelectorAll('.hcm-lev-del').forEach(b => b.addEventListener('click', () => removeEvent(parseFloat(b.dataset.id))));
+    el.querySelectorAll('.hcm-lev-del').forEach(b=>b.addEventListener('click',()=>removeEvent(parseFloat(b.dataset.id))));
 }
 
-function buildPF() {
-    const sel = document.getElementById('hcm-pfilter'); if (!sel) return;
-    const cur = sel.value;
-    const ps  = [...new Set(calData().events.map(e => e.person).filter(Boolean))];
-    sel.innerHTML = '<option value="">ทุกคน</option>' + ps.map(p => `<option value="${p}">${p}</option>`).join('');
-    sel.value = cur;
+function buildPF(){
+    const sel=document.getElementById('hcm-pfilter'); if(!sel) return;
+    const cur=sel.value;
+    const ps=[...new Set(calData().events.map(e=>e.person).filter(Boolean))];
+    sel.innerHTML='<option value="">ทุกคน</option>'+ps.map(p=>`<option value="${p}">${p}</option>`).join('');
+    sel.value=cur;
 }
 
-function saveEvent() {
-    const act = document.getElementById('hcm-a-act').value.trim(); if (!act) return;
-    addEvent({ person: document.getElementById('hcm-a-person').value.trim(),
-        date: document.getElementById('hcm-a-date').value || dStr(new Date()),
-        time: document.getElementById('hcm-a-time').value, activity: act,
-        symbol: document.getElementById('hcm-a-sym').value,
-        details: document.getElementById('hcm-a-detail').value.trim() });
-    document.getElementById('hcm-a-act').value = ''; document.getElementById('hcm-a-detail').value = '';
-    switchSub('cal', 'list'); renderList();
+function saveEvent(){
+    const act=document.getElementById('hcm-a-act').value.trim(); if(!act) return;
+    addEvent({ person:document.getElementById('hcm-a-person').value.trim(),
+        date:document.getElementById('hcm-a-date').value||dStr(new Date()),
+        time:document.getElementById('hcm-a-time').value, activity:act,
+        symbol:document.getElementById('hcm-a-sym').value,
+        details:document.getElementById('hcm-a-detail').value.trim() });
+    document.getElementById('hcm-a-act').value=''; document.getElementById('hcm-a-detail').value='';
+    switchSub('cal','list'); renderList();
 }
 
-function refreshCalUI() {
-    if (curSection !== 'cal') return;
-    renderGrid(); renderList(); buildPF();
-}
+function refreshCalUI(){ if(curSection!=='cal') return; renderGrid(); renderList(); buildPF(); }
 
-// ── Code UI ───────────────────────────────────────────────────
-function refreshCodeUI() {
-    const blocks = codeData().blocks;
-    const tok = blocks.reduce((a, b) => a + b.tokens, 0);
-    setT('hcm-total', blocks.length); setT('hcm-tok', '~' + tok); updateBadge();
-    const list = document.getElementById('hcm-codelist'); if (!list) return;
-    if (!blocks.length) { list.innerHTML = '<div class="hcm-empty"><p>ยังไม่มีบล็อก</p></div>'; return; }
-    list.innerHTML = blocks.map(b => `
-      <div class="hcm-card">
-        <div class="hcm-chead">
-          <span class="hcm-ctag">&lt;code${b.id}&gt;</span>
-          <span class="hcm-cid">#${b.id}·${b.ts}</span>
-          <div style="display:flex;gap:2px">
-            <div class="hcm-ib" data-a="preview" data-id="${b.id}">&#9675;</div>
-            <div class="hcm-ib" data-a="copy" data-id="${b.id}">&#9632;</div>
-            <div class="hcm-ib hcm-del" data-a="del" data-id="${b.id}">&#215;</div>
-          </div>
-        </div>
-        <div style="padding:5px 8px 7px">
-          <div class="hcm-cpre">${esc(b.html)}</div>
-          <div class="hcm-cmeta"><span>~${b.tokens} tok</span><span>msg#${b.msgId||'—'}</span></div>
-        </div>
-      </div>`).join('');
-    list.querySelectorAll('.hcm-ib').forEach(btn => btn.addEventListener('click', () => {
-        const id = parseInt(btn.dataset.id);
-        if (btn.dataset.a === 'preview') openPop(id);
-        if (btn.dataset.a === 'copy')    copyBlock(id, btn);
-        if (btn.dataset.a === 'del')     removeBlock(id);
+function refreshCodeUI(){
+    const blocks=codeData().blocks;
+    const total=blocks.length, tok=blocks.reduce((a,b)=>a+b.tokens,0);
+    setT('hcm-total',total); setT('hcm-tok','~'+tok); updateBadge();
+    const list=document.getElementById('hcm-codelist'); if(!list) return;
+    if(!total){ list.innerHTML='<div class="hcm-empty"><p>ยังไม่มีบล็อก</p></div>'; return; }
+    list.innerHTML=blocks.map(b=>`<div class="hcm-card"><div class="hcm-chead"><span class="hcm-ctag">&lt;code${b.id}&gt;</span><span class="hcm-cid">#${b.id}·${b.ts}</span><div style="display:flex;gap:2px"><div class="hcm-ib" data-a="preview" data-id="${b.id}">&#9675;</div><div class="hcm-ib" data-a="copy" data-id="${b.id}">&#9632;</div><div class="hcm-ib hcm-del" data-a="del" data-id="${b.id}">&#215;</div></div></div><div style="padding:5px 8px 7px"><div class="hcm-cpre">${esc(b.html)}</div><div class="hcm-cmeta"><span>~${b.tokens} tok</span><span>msg#${b.msgId||'—'}</span></div></div></div>`).join('');
+    list.querySelectorAll('.hcm-ib').forEach(btn=>btn.addEventListener('click',()=>{
+        const id=parseInt(btn.dataset.id);
+        if(btn.dataset.a==='preview') openPop(id);
+        if(btn.dataset.a==='copy')    copyBlock(id,btn);
+        if(btn.dataset.a==='del')     removeBlock(id);
     }));
 }
 
-function openPop(id) {
-    const b = codeData().blocks.find(x => x.id === id); if (!b) return;
-    curPopId = id; setT('hcm-pt', `code${b.id} · ~${b.tokens} token`);
-    document.getElementById('hcm-psrc' ).textContent = b.html;
-    document.getElementById('hcm-pprev').innerHTML   = b.html;
-    document.querySelectorAll('.hcm-ptt').forEach(t => t.classList.remove('hcm-on'));
+function openPop(id){
+    const b=codeData().blocks.find(x=>x.id===id); if(!b) return;
+    curPopId=id; setT('hcm-pt',`code${b.id} · ~${b.tokens} token`);
+    document.getElementById('hcm-psrc' ).textContent=b.html;
+    document.getElementById('hcm-pprev').innerHTML  =b.html;
+    document.querySelectorAll('.hcm-ptt').forEach(t=>t.classList.remove('hcm-on'));
     document.querySelector('[data-pt="src"]').classList.add('hcm-on');
-    document.getElementById('hcm-ptsrc' ).style.display = 'block';
-    document.getElementById('hcm-ptprev').style.display = 'none';
+    document.getElementById('hcm-ptsrc' ).style.display='block';
+    document.getElementById('hcm-ptprev').style.display='none';
     document.getElementById('hcm-pop').classList.add('hcm-on');
 }
-function closePop() { document.getElementById('hcm-pop').classList.remove('hcm-on'); }
-function copyBlock(id, btn) {
-    const b = codeData().blocks.find(x => x.id === id); if (!b) return;
-    navigator.clipboard.writeText(b.html).catch(() => {});
-    btn.textContent = '\u2713'; setTimeout(() => { btn.textContent = ''; btn.innerHTML = '&#9632;'; }, 1200);
+function closePop(){ document.getElementById('hcm-pop').classList.remove('hcm-on'); }
+function copyBlock(id,btn){
+    const b=codeData().blocks.find(x=>x.id===id); if(!b) return;
+    navigator.clipboard.writeText(b.html).catch(()=>{});
+    btn.textContent='\u2713'; setTimeout(()=>btn.textContent='&#9632;',1200);
 }
-
-function renderCodeMarkers(msgId) {
-    const blocks = codeData().blocks.filter(b => b.msgId === msgId);
-    if (!blocks.length) return;
-    const el = document.querySelector(`[mesid="${msgId}"] .mes_text`); if (!el) return;
-    blocks.forEach(b => {
-        el.innerHTML = el.innerHTML.replace(
-            `<code${b.id}></code${b.id}>`,
-            `<div class="hcm-inline-block"><span class="hcm-inline-tag">HTML Block ${b.id}</span><span class="hcm-inline-meta">~${b.tokens} tok</span><button class="hcm-inline-prev" onclick="hcmOpenPop(${b.id})">Preview</button></div>`
-        );
+function exportJSON(){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([JSON.stringify({chatId:getChatId(),calendar:calData(),code:codeData()},null,2)],{type:'application/json'}));
+    a.download=`hcm-${getChatId()}.json`; a.click();
+}
+function renderCodeMarkers(msgId){
+    const blocks=codeData().blocks.filter(b=>b.msgId===msgId);
+    if(!blocks.length) return;
+    const el=document.querySelector(`[mesid="${msgId}"] .mes_text`); if(!el) return;
+    blocks.forEach(b=>{
+        const tag=`<code${b.id}></code${b.id}>`;
+        const card=`<div class="hcm-inline-block"><span class="hcm-inline-tag">HTML Block ${b.id}</span><span class="hcm-inline-meta">~${b.tokens} tok</span><button class="hcm-inline-prev" onclick="hcmOpenPop(${b.id})">Preview</button></div>`;
+        el.innerHTML=el.innerHTML.replace(tag,card);
     });
 }
-window.hcmOpenPop = function(id) { if (!isOpen) openPanel(); openSec('code'); openPop(id); };
+window.hcmOpenPop=function(id){ if(!isOpen) openPanel(); openSec('code'); openPop(id); };
 
-// ── Clock ─────────────────────────────────────────────────────
-function startClock() {
-    function tick() {
-        const n = new Date();
-        setT('hcm-clock', n.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit', second:'2-digit' }));
-        setT('hcm-date',  n.toLocaleDateString('th-TH', { month:'short', day:'numeric', year:'numeric' }));
+function startClock(){
+    function tick(){
+        const n=new Date();
+        setT('hcm-clock',n.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+        setT('hcm-date', n.toLocaleDateString('th-TH',{month:'short',day:'numeric',year:'numeric'}));
     }
-    tick(); setInterval(tick, 1000);
+    tick(); setInterval(tick,1000);
+}
+function updateChatLabel(){ try{ const ctx=_getCtx(); setT('hcm-chatname',ctx.name2||'SillyTavern'); setT('hcm-charname',ctx.name2||'—'); }catch{} }
+function updateBadge(){ const n=codeData().blocks.length; setT('hcm-bdg-n',n); setT('hcm-cnt',n); }
+function refreshAllUI(){ refreshCodeUI(); updateChatLabel(); if(curSection==='cal'){ renderGrid(); renderList(); buildPF(); } }
+function setHdr(ey,ti,su){ setT('hcm-eyebrow',ey); setT('hcm-title',ti); setT('hcm-sub',su); }
+function setT(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
+function dStr(d){ return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function registerHooks(){
+    const es=window.eventSource, et=window.event_types;
+    if(!es||!et){ console.warn('[HCM] ST events not available'); return; }
+    es.on(et.MESSAGE_RECEIVED, msgId=>processMessage(msgId));
+    es.on(et.MESSAGE_RENDERED, msgId=>renderCodeMarkers(msgId));
+    es.on(et.CHAT_CHANGED, ()=>{ gCnt=0; updateInjection(); refreshAllUI(); });
 }
 
-function updateChatLabel() {
-    try { const ctx = _getCtx(); setT('hcm-chatname', ctx.name2 || 'SillyTavern'); setT('hcm-charname', ctx.name2 || '—'); } catch {}
-}
-function updateBadge() { const n = codeData().blocks.length; setT('hcm-bdg-n', n); setT('hcm-cnt', n); }
-function refreshAllUI() { refreshCodeUI(); updateChatLabel(); if (curSection === 'cal') { renderGrid(); renderList(); buildPF(); } }
-function setHdr(ey, ti, su) { setT('hcm-eyebrow', ey); setT('hcm-title', ti); setT('hcm-sub', su); }
-function setT(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
-function dStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function pad(n)  { return String(n).padStart(2, '0'); }
-function esc(s)  { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ── ST Hooks ──────────────────────────────────────────────────
-function registerHooks() {
-    const es = window.eventSource, et = window.event_types;
-    if (!es || !et) { console.warn('[HCM] ST events not available'); return; }
-    es.on(et.MESSAGE_RECEIVED, msgId => processMessage(msgId));
-    es.on(et.MESSAGE_RENDERED, msgId => renderCodeMarkers(msgId));
-    es.on(et.CHAT_CHANGED, () => { gCnt = 0; updateInjection(); refreshAllUI(); });
-}
-
-// ── Entry ─────────────────────────────────────────────────────
 console.log('[HCM] Registering entry...');
 
-function hcmInit() {
-    try {
-        console.log('[HCM] hcmInit');
+function hcmInit(){
+    try{
+        console.log('[HCM] hcmInit called');
         S(); createPanel(); registerHooks(); updateInjection();
-        console.log('[HCM] ✓ OK');
-    } catch(e) {
-        console.error('[HCM] Error:', e);
-        const dbg = document.createElement('div');
-        dbg.style.cssText = 'position:fixed;bottom:10px;right:10px;z-index:99999;background:red;color:white;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer';
-        dbg.textContent = 'HCM ERROR'; dbg.onclick = () => alert(e.stack || e);
+        console.log('[HCM] ✓ Ready');
+    } catch(e){
+        console.error('[HCM] Error:',e);
+        const dbg=document.createElement('div');
+        dbg.style.cssText='position:fixed;bottom:10px;right:10px;z-index:99999;background:red;color:white;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer';
+        dbg.textContent='HCM ERROR — tap for details'; dbg.onclick=()=>alert(e.stack||e);
         document.body.appendChild(dbg);
     }
 }
 
-if (typeof jQuery !== 'undefined') jQuery(hcmInit);
-else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hcmInit);
+if(typeof jQuery!=='undefined') jQuery(hcmInit);
+else if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hcmInit);
 else hcmInit();
-        
+                                                           
