@@ -75,15 +75,18 @@
 /* bookmarks อยู่หลังกรอบ (z-index ต่ำกว่า .hcm-book) */
 .hcm-bmarks {
   position:absolute; right:-1px; top:20px;
-  display:flex; flex-direction:column; gap:2px; z-index:2;
+  display:flex; flex-direction:column; gap:2px; z-index:50;
+  pointer-events:all;
 }
 .hcm-bm {
-  width:13px; height:46px; display:flex; align-items:center; justify-content:center;
-  font-size:4.5px; font-weight:700; color:rgba(255,255,255,.65);
+  width:16px; height:48px; display:flex; align-items:center; justify-content:center;
+  font-size:5px; font-weight:700; color:rgba(255,255,255,.75);
   writing-mode:vertical-rl; letter-spacing:.5px; text-transform:uppercase;
-  cursor:pointer; user-select:none;
-  border-left:1px solid rgba(255,255,255,.07);
+  cursor:pointer !important; user-select:none;
+  border-left:1px solid rgba(255,255,255,.1);
   transition:width .15s, filter .15s;
+  position:relative; z-index:50;
+  pointer-events:all !important;
 }
 .hcm-bm:hover { filter:brightness(1.3); width:17px; }
 .hcm-bm:nth-child(1){background:linear-gradient(180deg,#6840a0,#4828a0)}
@@ -215,6 +218,9 @@ button, input, select, textarea, a { cursor:pointer !important; }
 .hcm-trow.hcm-locked .hcm-tbig{color:var(--ik4);text-shadow:none}
 .hcm-trow.hcm-locked .hcm-tname{color:var(--ik3)}
 .hcm-tarrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--ik4);opacity:.22;transition:opacity .14s,color .14s,transform .14s;font-family:'Cormorant Garamond',serif;font-weight:700}
+.hcm-tgem.hcm-grey span{color:var(--ik4)}
+.hcm-tgem.hcm-gold{border-color:rgba(220,192,120,.35);background:rgba(220,192,120,.1)}
+.hcm-tgem.hcm-gold span{color:var(--go2)}
 
 /* divider */
 .hcm-dvd{display:flex;align-items:center;gap:6px;margin:7px 0 4px}
@@ -244,7 +250,7 @@ button, input, select, textarea, a { cursor:pointer !important; }
 .hcm-ib:hover{background:rgba(255,255,255,.12);color:white}
 .hcm-ib.hcm-del:hover{background:rgba(200,50,50,.2);color:#ff8080}
 .hcm-cpre{font-family:'Courier New',monospace;font-size:8px;color:var(--ik2);background:rgba(0,0,0,.22);border:1px solid var(--bdr);padding:3px 6px;max-height:36px;overflow:hidden;position:relative;line-height:1.5;white-space:pre-wrap;word-break:break-all}
-                                                                                                   .hcm-cpre::after{content:'';position:absolute;bottom:0;left:0;right:0;height:12px;background:linear-gradient(transparent,rgba(10,8,24,.85))}
+.hcm-cpre::after{content:'';position:absolute;bottom:0;left:0;right:0;height:12px;background:linear-gradient(transparent,rgba(10,8,24,.85))}
 .hcm-cmeta{display:flex;gap:7px;margin-top:3px;font-size:7.5px;color:var(--ik4);font-family:'Cormorant Garamond',serif;font-style:italic}
 
 /* features */
@@ -367,3 +373,4 @@ button, input, select, textarea, a { cursor:pointer !important; }
 .hcm-pb{flex:1;overflow-y:auto;padding:11px}
 #hcm-psrc{font-family:'Courier New',monospace;font-size:9px;color:rgba(255,255,255,.88);white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);padding:10px;display:block}
 #hcm-pprev{border:1px solid var(--bdr);padding:12px;min-height:60px;background:white}
+                                                                                                                                                                                                                                                                                                                                                           
