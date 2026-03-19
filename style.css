@@ -98,12 +98,10 @@
   box-shadow:inset 1px 0 0 rgba(255,255,255,.05), -4px 0 32px rgba(0,0,0,.6);
   display:flex; flex-direction:column;
   max-height:88vh; overflow:hidden;
-  position:relative; z-index:5;   /* สูงกว่า bookmarks */
-  cursor:grab;
+  position:relative; z-index:5;
 }
 .hcm-book:active { cursor:grabbing; }
-/* scroll area และ interactive elements — คืน cursor ปกติ */
-.hcm-body, .hcm-body * { cursor:auto; }
+/* interactive elements */
 .hcm-hdbtn, .hcm-bm, .hcm-ib, .hcm-trow.hcm-can,
 .hcm-cal-nb, .hcm-det-del, .hcm-lev-del,
 button, input, select, textarea, a { cursor:pointer !important; }
@@ -112,9 +110,9 @@ button, input, select, textarea, a { cursor:pointer !important; }
   content:''; position:absolute; inset:0; pointer-events:none; z-index:6;
   background-image:
     linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
-        linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
   background-size:22px 22px;
-}
+  }
 /* top frost */
 .hcm-book::before {
   content:''; position:absolute; top:0; left:0; right:0; height:60px;
@@ -164,8 +162,9 @@ button, input, select, textarea, a { cursor:pointer !important; }
 .hcm-title{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:700;font-size:20px;color:white;line-height:1;text-shadow:0 0 20px rgba(190,130,220,.35)}
 .hcm-sub{font-size:7.5px;color:var(--ik3);margin-top:3px}
 .hcm-hdbtns{display:flex;gap:4px;margin-top:3px}
-.hcm-hdbtn{width:20px;height:20px;border:1px solid var(--bdr);background:rgba(255,255,255,.05);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ik3);font-family:'Cormorant Garamond',serif;font-weight:700;transition:background .12s;z-index:10;position:relative}
+.hcm-hdbtn{width:20px;height:20px;border:1px solid var(--bdr);background:rgba(255,255,255,.05);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ik3);font-family:'Cormorant Garamond',serif;font-weight:700;transition:background .12s,color .12s,border-color .12s;z-index:10;position:relative}
 .hcm-hdbtn:hover{background:rgba(255,255,255,.12);color:white}
+#hcm-drag-toggle.hcm-drag-on{background:rgba(92,221,154,.18)!important;border-color:rgba(92,221,154,.5)!important;color:#5cdd9a!important;box-shadow:0 0 8px rgba(92,221,154,.2)}
 
 /* date row */
 .hcm-drow{flex-shrink:0;padding:3px 15px 3px 10px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.015);z-index:10;position:relative}
@@ -226,7 +225,7 @@ button, input, select, textarea, a { cursor:pointer !important; }
 
 /* status pill */
 .hcm-spill{border:1px solid var(--bdr);padding:5px 10px;display:flex;align-items:center;gap:6px;font-size:9.5px;color:var(--ik2);margin-bottom:7px;background:rgba(255,255,255,.04)}
-  .hcm-sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:#5cdd9a;box-shadow:0 0 0 3px rgba(92,221,154,.12);animation:hcmPulse 2.5s infinite}
+.hcm-sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:#5cdd9a;box-shadow:0 0 0 3px rgba(92,221,154,.12);animation:hcmPulse 2.5s infinite}
 @keyframes hcmPulse{0%,100%{box-shadow:0 0 0 3px rgba(92,221,154,.12)}50%{box-shadow:0 0 0 5px rgba(92,221,154,.03)}}
 
 /* stats */
@@ -342,4 +341,3 @@ button, input, select, textarea, a { cursor:pointer !important; }
 .hcm-pb{flex:1;overflow-y:auto;padding:11px}
 #hcm-psrc{font-family:'Courier New',monospace;font-size:9px;color:rgba(255,255,255,.88);white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);padding:10px;display:block}
 #hcm-pprev{border:1px solid var(--bdr);padding:12px;min-height:60px;background:white}
-              
