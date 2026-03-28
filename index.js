@@ -1,770 +1,332 @@
-/**
- * HCM Diary v2.2 — no imports, window globals only
- */
-console.log('[HCM] index.js parsing...');
+// ============================================================
+//  HTML Ghost — SillyTavern Extension
+//  Strips HTML from bot messages; logs removed tags for review
+// ============================================================
 
-const _getCtx   = () => { try { return window.SillyTavern?.getContext?.() ?? {}; } catch { return {}; } };
-const _saveSet  = () => { try { if (window.saveSettingsDebounced) window.saveSettingsDebounced(); } catch {} };
-const _setPrompt = (key, text, pos, depth) => {
-    try { if (window.setExtensionPrompt) window.setExtensionPrompt(key, text, pos, depth); } catch {}
-};
+(function () {
+  'use strict';
 
-const EXT     = 'hcm_diary';
-const INJ_KEY = 'hcm_calendar';
-const CAL_RE  = /\[CAL:([^\]]+)\]/gi;
-const HTML_RE = /```html\s*([\s\S]*?)```/gi;
+  /* ── Constants ─────────────────────────────────────────── */
+  const EXT_NAME   = 'HTML Ghost';
+  const STORE_KEY  = 'htmlghost_log';
+  const MAX_LOG    = 200;          // max entries kept in memory
 
-const SYM = {
-    heart  : { c: '\u2665', l: 'นัดพบ',       col: '#e87098' },
-    star   : { c: '\u2605', l: 'สำคัญ',        col: '#e8c870' },
-    diamond: { c: '\u25C6', l: 'ประชุม',       col: '#9898e8' },
-    note   : { c: '\u266A', l: 'บันเทิง',      col: '#70c898' },
-    cross  : { c: '\u271D', l: 'ขัดแย้ง',      col: '#e87070' },
-    task   : { c: '\u2295', l: 'งาน/ภารกิจ',  col: '#88a8d8' },
-    general: { c: '\u25C7', l: 'ทั่วไป',       col: '#a898c8' },
-};
+  /* ── State ──────────────────────────────────────────────── */
+  let log = [];          // { id, ts, char, raw, stripped, tags }
+  let panelOpen = false;
+  let searchQuery = '';
 
-const DEFAULTS = {
-    enabled: true, calendarEnabled: true, codeEnabled: true,
-    calendarData: {}, codeData: {}
-};
-
-function S() {
-    const store = window.extension_settings;
-    if (!store) return JSON.parse(JSON.stringify(DEFAULTS));
-    if (!store[EXT]) store[EXT] = {};
-    for (const k in DEFAULTS) {
-        if (store[EXT][k] === undefined)
-            store[EXT][k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
+  /* ── Helpers ────────────────────────────────────────────── */
+  function stripHtml(html) {
+    // Collect every tag removed
+    const tags = [];
+    const tagRe = /<\/?[a-zA-Z][^>]*>/g;
+    let match;
+    while ((match = tagRe.exec(html)) !== null) {
+      tags.push(match[0]);
     }
-    return store[EXT];
-}
+    // Decode entities and strip tags
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const text = tmp.textContent || tmp.innerText || '';
+    return { text, tags };
+  }
 
-function getChatId() { return _getCtx().chatId || 'default'; }
+  function timestamp() {
+    return new Date().toLocaleTimeString('th-TH', { hour12: false });
+  }
 
-function calData() {
-    const s = S(), id = getChatId();
-    if (!s.calendarData[id]) s.calendarData[id] = { events: [] };
-    return s.calendarData[id];
-}
+  function addEntry(entry) {
+    log.unshift(entry);
+    if (log.length > MAX_LOG) log.pop();
+  }
 
-function addEvent(evt) {
-    const evts = calData().events;
-    const dup = evts.find(e => e.date === evt.date && e.time === evt.time &&
-        e.person === evt.person && e.activity === evt.activity);
-    if (dup) return;
-    evts.push({ id: Date.now() + Math.random(), ...evt });
-    _saveSet(); updateInjection(); refreshCalUI();
-}
+  /* ── Hook into SillyTavern message rendering ────────────── */
+  // SillyTavern fires this event after a message is added to the chat
+  // We patch the message text node before it renders
+  function hookMessages() {
+    // Primary hook: MESSAGE_RENDERED event
+    if (window.eventSource && window.event_types) {
+      const ev = window.event_types;
 
-function removeEvent(id) {
-    const d = calData();
-    d.events = d.events.filter(e => e.id !== id);
-    _saveSet(); updateInjection(); refreshCalUI();
-}
+      // After message received — strip HTML in the message object itself
+      eventSource.on(ev.MESSAGE_RECEIVED, (/** @type {number} */ idx) => {
+        processMessage(idx);
+      });
 
-function updateInjection() {
-    if (!S().calendarEnabled) { _setPrompt(INJ_KEY, '', 1, 0); return; }
-    const evts = calData().events;
-    if (!evts.length) { _setPrompt(INJ_KEY, '', 1, 0); return; }
-    const now = new Date(), todayS = dStr(now);
-    const sorted = [...evts].sort((a, b) => (`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`));
-    const upcoming = sorted.filter(e => (e.date || '') >= todayS);
-    let text = `[ปฏิทินตัวละคร — ${todayS} ${pad(now.getHours())}:${pad(now.getMinutes())}]\n`;
-    if (!upcoming.length) { text += '(ไม่มีกำหนดการที่จะถึง)'; }
-    else upcoming.slice(0, 15).forEach(e => {
-        text += `• ${e.date === todayS ? 'วันนี้' : e.date} ${e.time || '--:--'} | ${e.person || 'ทุกคน'} | ${e.activity || ''}`;
-        if (e.details) text += ` — ${e.details}`;
-        text += '\n';
-    });
-    text += '[/ปฏิทินตัวละคร]';
-    _setPrompt(INJ_KEY, text, 1, 0);
-}
+      // Also handle on render for safety
+      eventSource.on(ev.MESSAGE_RENDERED, (/** @type {number} */ idx) => {
+        processRenderedMessage(idx);
+      });
+    }
 
-let gCnt = 0;
-function codeData() {
-    const s = S(), id = getChatId();
-    if (!s.codeData[id]) s.codeData[id] = { blocks: [] };
-    return s.codeData[id];
-}
+    // Fallback: MutationObserver on chat area
+    observeChat();
+  }
 
-function addBlock(html, msgId) {
-    gCnt++;
-    const b = { id: gCnt, html, msgId, tokens: Math.ceil(html.length / 4),
-        ts: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) };
-    codeData().blocks.push(b);
-    _saveSet(); refreshCodeUI(); return b;
-}
+  function processMessage(idx) {
+    try {
+      const chat = window.chat;
+      if (!chat || !chat[idx]) return;
+      const msg = chat[idx];
+      if (msg.is_user) return;                    // only bot messages
 
-function removeBlock(id) {
-    codeData().blocks = codeData().blocks.filter(b => b.id !== id);
-    _saveSet(); refreshCodeUI();
-}
+      const raw = msg.mes || '';
+      const { text, tags } = stripHtml(raw);
 
-function processMessage(messageId) {
-    const ctx = _getCtx();
-    if (!ctx.chat || !ctx.chat[messageId]) return;
-    const msg = ctx.chat[messageId];
-    if (msg.is_user) return;
-    let text = msg.mes, dirty = false;
+      if (tags.length === 0) return;              // nothing to strip
 
-    if (S().calendarEnabled) {
-        const hits = [...text.matchAll(CAL_RE)];
-        hits.forEach(m => {
-            const a = parseAttrs(m[1]);
-            if (a.activity || a.date) addEvent({
-                person: a.person || '', date: a.date || dStr(new Date()),
-                time: a.time || '', activity: a.activity || '',
-                symbol: a.symbol || 'general', details: a.details || ''
-            });
+      // Mutate the message in place (SillyTavern re-renders from chat[])
+      msg.mes = text;
+
+      addEntry({
+        id:       idx,
+        ts:       timestamp(),
+        char:     msg.name || 'Bot',
+        raw:      raw,
+        stripped: text,
+        tags:     tags,
+      });
+
+      updateBadge();
+    } catch (e) {
+      console.warn(`[${EXT_NAME}] processMessage error:`, e);
+    }
+  }
+
+  function processRenderedMessage(idx) {
+    // Catch anything that slipped through (e.g. loaded history)
+    try {
+      const el = document.querySelector(`#chat .mes[mesid="${idx}"] .mes_text`);
+      if (!el) return;
+      const html = el.innerHTML;
+      const { text, tags } = stripHtml(html);
+      if (tags.length === 0) return;
+
+      el.textContent = text;          // replace with plain text
+
+      // Only log if not already logged
+      if (!log.find(e => e.id === idx)) {
+        addEntry({
+          id:       idx,
+          ts:       timestamp(),
+          char:     '',
+          raw:      html,
+          stripped: text,
+          tags:     tags,
         });
-        if (hits.length) { text = text.replace(CAL_RE, '').replace(/\n{3,}/g, '\n\n').trim(); dirty = true; }
-        CAL_RE.lastIndex = 0;
-    }
-
-    if (S().codeEnabled) {
-        const hits = [...text.matchAll(HTML_RE)];
-        if (hits.length) {
-            hits.forEach(m => addBlock(m[1].trim(), messageId));
-            let idx = 0;
-            const blocks = codeData().blocks;
-            text = text.replace(HTML_RE, () => {
-                const b = blocks[blocks.length - hits.length + idx++];
-                return b ? `<code${b.id}></code${b.id}>` : '';
-            }).trim();
-            HTML_RE.lastIndex = 0; dirty = true;
-        }
-    }
-
-    if (dirty) {
-        msg.mes = text;
-        const el = document.querySelector(`[mesid="${messageId}"] .mes_text`);
-        if (el) el.innerHTML = msg.mes;
         updateBadge();
+      }
+    } catch (e) {
+      console.warn(`[${EXT_NAME}] processRenderedMessage error:`, e);
     }
-}
+  }
 
-function parseAttrs(str) {
-    const a = {};
-    str.split(',').forEach(p => { const i = p.indexOf('='); if (i > 0) a[p.slice(0, i).trim()] = p.slice(i + 1).trim(); });
-    return a;
-}
+  function observeChat() {
+    const chatEl = document.getElementById('chat');
+    if (!chatEl) {
+      setTimeout(observeChat, 800);
+      return;
+    }
 
-let curSection = 'toc';
-let calView = { year: new Date().getFullYear(), month: new Date().getMonth() };
-let selDate = null, curPopId = null, isOpen = false;
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mut) => {
+        mut.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return;
+          const mesEl = node.classList?.contains('mes') ? node
+            : node.querySelector?.('.mes');
+          if (!mesEl) return;
+          if (mesEl.dataset.isUser === 'true') return;
 
-function createPanel() {
-    if (document.getElementById('hcm-launcher')) return;
-    const lnc = document.createElement('div');
-    lnc.id = 'hcm-launcher';
-    lnc.innerHTML = `<div class="hcm-lt-gem"><span>H</span></div>
-      <div class="hcm-lt-lbl">HCM</div>
-      <div id="hcm-bdg"><span id="hcm-bdg-n">0</span></div>`;
-    lnc.addEventListener('click', togglePanel);
-    lnc.addEventListener('touchend', e => { e.preventDefault(); togglePanel(); });
-    document.body.appendChild(lnc);
+          const textEl = mesEl.querySelector('.mes_text');
+          if (!textEl) return;
 
+          const html = textEl.innerHTML;
+          const { text, tags } = stripHtml(html);
+          if (tags.length === 0) return;
+
+          textEl.textContent = text;
+
+          const idx = parseInt(mesEl.getAttribute('mesid') || '-1');
+          if (!log.find(e => e.id === idx)) {
+            addEntry({
+              id:       idx,
+              ts:       timestamp(),
+              char:     mesEl.querySelector('.name_text')?.textContent || 'Bot',
+              raw:      html,
+              stripped: text,
+              tags:     tags,
+            });
+            updateBadge();
+          }
+        });
+      });
+    });
+
+    observer.observe(chatEl, { childList: true, subtree: true });
+  }
+
+  /* ── Badge (floating icon) ──────────────────────────────── */
+  function createBadge() {
+    const btn = document.createElement('button');
+    btn.id = 'hg-badge';
+    btn.innerHTML = `
+      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="none">
+        <path d="M16 2 L18.5 13.5 L30 16 L18.5 18.5 L16 30 L13.5 18.5 L2 16 L13.5 13.5 Z"
+              fill="url(#hg-grad)" stroke="rgba(255,255,255,0.3)" stroke-width="0.5"/>
+        <defs>
+          <linearGradient id="hg-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#a8d8ea"/>
+            <stop offset="100%" stop-color="#d4a8ea"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span id="hg-badge-count" class="hg-hidden">0</span>
+    `;
+    btn.title = 'HTML Ghost — คลิกดู log';
+    btn.addEventListener('click', togglePanel);
+    document.body.appendChild(btn);
+  }
+
+  function updateBadge() {
+    const count = document.getElementById('hg-badge-count');
+    if (!count) return;
+    if (log.length > 0) {
+      count.textContent = log.length > 99 ? '99+' : log.length;
+      count.classList.remove('hg-hidden');
+    } else {
+      count.classList.add('hg-hidden');
+    }
+  }
+
+  /* ── Panel ──────────────────────────────────────────────── */
+  function createPanel() {
     const panel = document.createElement('div');
-    panel.id = 'hcm-panel';
-    panel.innerHTML = buildHTML();
+    panel.id = 'hg-panel';
+    panel.classList.add('hg-hidden');
+    panel.innerHTML = `
+      <div id="hg-panel-header">
+        <span id="hg-panel-title">
+          <svg width="14" height="14" viewBox="0 0 32 32" fill="none" style="vertical-align:middle;margin-right:6px">
+            <path d="M16 2 L18.5 13.5 L30 16 L18.5 18.5 L16 30 L13.5 18.5 L2 16 L13.5 13.5 Z"
+                  fill="url(#hg-grad2)"/>
+            <defs>
+              <linearGradient id="hg-grad2" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#a8d8ea"/>
+                <stop offset="100%" stop-color="#d4a8ea"/>
+              </linearGradient>
+            </defs>
+          </svg>HTML Ghost
+        </span>
+        <button id="hg-close" title="ปิด">✕</button>
+      </div>
+
+      <div id="hg-search-wrap">
+        <input id="hg-search" type="text" placeholder="ค้นหา tag, ชื่อ, ข้อความ…" autocomplete="off" spellcheck="false"/>
+      </div>
+
+      <div id="hg-list-wrap">
+        <div id="hg-list"></div>
+        <div id="hg-empty">ยังไม่มี HTML ถูกตัดออก</div>
+      </div>
+
+      <div id="hg-panel-footer">
+        <button id="hg-clear-btn">ล้าง log</button>
+        <span id="hg-footer-count">0 รายการ</span>
+      </div>
+    `;
+
     document.body.appendChild(panel);
 
-    initStars();
-    bindEvents();
-    startClock();
-    refreshAllUI();
-    console.log('[HCM] Panel created OK');
-}
-
-function buildHTML() {
-    const symOpts = Object.entries(SYM).map(([k, v]) => `<option value="${k}">${v.c} ${v.l}</option>`).join('');
-    return `
-<canvas id="hcm-sc"></canvas>
-<div class="hcm-frame">
-  <div class="hcm-rings">${'<div class="hcm-ring"></div>'.repeat(8)}</div>
-  <div class="hcm-bmarks">
-    <div class="hcm-bm" data-bm="code">โค้ด</div>
-    <div class="hcm-bm" data-bm="cal">ปฏิทิน</div>
-    <div class="hcm-bm" data-bm="toc">เมนู</div>
-  </div>
-  <div class="hcm-book">
-    <div class="hcm-band hcm-top hcm-drag-zone"></div>
-    <div class="hcm-sb hcm-drag-zone" id="hcm-drag-handle">
-      <div class="hcm-sb-l"><div class="hcm-sb-dot"></div><span id="hcm-clock">--:--:--</span><span class="hcm-sep">·</span><span id="hcm-chatname">SillyTavern</span></div>
-      <div class="hcm-sb-r" id="hcm-charname">—</div>
-    </div>
-    <div class="hcm-hd hcm-drag-zone">
-      <div class="hcm-hdm">
-        <span class="hcm-eyebrow" id="hcm-eyebrow">HCM Diary</span>
-        <div class="hcm-title" id="hcm-title">สารบัญระบบ</div>
-        <div class="hcm-sub" id="hcm-sub">ส่วนขยาย SillyTavern</div>
-      </div>
-      <div class="hcm-hdbtns">
-        <div class="hcm-hdbtn" id="hcm-back" style="display:none">&#8592;</div>
-        <div class="hcm-hdbtn" id="hcm-close">&#215;</div>
-      </div>
-    </div>
-    <div class="hcm-drow"><span class="hcm-dlbl">Date</span><div class="hcm-dval" id="hcm-date">—</div></div>
-    <div class="hcm-stabs" id="hcm-tabs-code">
-      <div class="hcm-stab hcm-on" data-sv="code">โค้ด <span class="hcm-tbadge" id="hcm-cnt">0</span></div>
-      <div class="hcm-stab" data-sv="settings">ตั้งค่า</div>
-    </div>
-    <div class="hcm-stabs" id="hcm-tabs-cal">
-      <div class="hcm-stab hcm-on" data-cv="month">เดือน</div>
-      <div class="hcm-stab" data-cv="list">รายการ</div>
-      <div class="hcm-stab" data-cv="add">+ เพิ่ม</div>
-    </div>
-    <div class="hcm-body">
-      <div id="hcm-v-toc">
-        <div class="hcm-toc-hd"><span class="hcm-toc-lbl">NOTE</span><span class="hcm-toc-yr">ระบบ &amp; เครื่องมือ</span></div>
-        <div class="hcm-trow hcm-can" data-nav="code">
-          <div class="hcm-tl"><div class="hcm-tbig">C</div><div class="hcm-tabb">CODE</div></div>
-          <div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 01</div><div class="hcm-tname">ตัวจัดการโค้ด</div><div class="hcm-tdesc">จัดเก็บ · แทนที่ · พรีวิว HTML</div></div>
-          <div class="hcm-tr"><div class="hcm-tgem"><span>I</span></div></div><div class="hcm-tarrow">&#8250;</div>
-        </div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">M</div><div class="hcm-tabb">MEM</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 02</div><div class="hcm-tname">จัดการความจำ</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
-        <div class="hcm-trow hcm-locked"><div class="hcm-tl"><div class="hcm-tbig">L</div><div class="hcm-tabb">LOG</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 04</div><div class="hcm-tname">บันทึกการสนทนา</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
-        <div class="hcm-trow hcm-locked" style="border-bottom:none"><div class="hcm-tl"><div class="hcm-tbig">S</div><div class="hcm-tabb">SYS</div></div><div class="hcm-tm"><div class="hcm-tnum">ระบบที่ 05</div><div class="hcm-tname">ตั้งค่าส่วนกลาง</div><div class="hcm-tdesc">เร็ว ๆ นี้</div></div><div class="hcm-tr"><div class="hcm-tgem hcm-grey"><span>&#10007;</span></div></div></div>
-        <div class="hcm-note-card">
-          <div class="hcm-nc-title">คำสั่ง AI สำหรับปฏิทิน</div>
-          <div class="hcm-nc-body">AI ใส่ tag ในบทโรล → extension จับ → ลบ → บันทึก → inject ก่อนโรลถัดไป<br><br>
-          <code>[CAL:person=,date=YYYY-MM-DD,time=HH:MM,activity=,symbol=,details=]</code><br>
-          symbols: heart · star · diamond · note · cross · task · general</div>
-        </div>
-      </div>
-      <div id="hcm-v-code" style="display:none;flex-direction:column">
-        <div id="hcm-sv-code" style="padding:10px 14px 12px 11px">
-          <div class="hcm-spill"><div class="hcm-sdot"></div><span>พร้อมทำงาน — เชื่อมต่อ ST</span></div>
-          <div class="hcm-srow">
-            <div class="hcm-sc2"><div class="hcm-scv" id="hcm-total">0</div><div class="hcm-scl">บล็อก</div></div>
-            <div class="hcm-sc2"><div class="hcm-scv" id="hcm-tok">~0</div><div class="hcm-scl">token ประหยัด</div></div>
-          </div>
-          <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">บล็อกที่จัดเก็บ</div></div>
-          <div id="hcm-codelist"></div>
-          <div class="hcm-btns">
-            <button class="hcm-btns2" id="hcm-clear-btn">&#215; ล้าง</button>
-            <button class="hcm-btnp" id="hcm-export-btn">&#8595; Export</button>
-          </div>
-        </div>
-        <div id="hcm-sv-settings" style="display:none;padding:10px 14px 12px 11px">
-          <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">ฟีเจอร์</div></div>
-          <div class="hcm-toggle-row" id="hcm-t-drag">
-            <div class="hcm-toggle-lbl">&#10021; ลากหน้าต่างได้</div>
-            <div class="hcm-tog" id="hcm-tog-drag"><span></span></div>
-          </div>
-          <div class="hcm-toggle-row hcm-tog-disabled">
-                      <div class="hcm-toggle-lbl">— ระบบที่ 2</div>
-            <div class="hcm-tog"><span></span></div>
-          </div>
-          <div class="hcm-toggle-row hcm-tog-disabled">
-            <div class="hcm-toggle-lbl">— ระบบที่ 3</div>
-            <div class="hcm-tog"><span></span></div>
-          </div>
-          <div class="hcm-toggle-row hcm-tog-disabled" style="border-bottom:none">
-            <div class="hcm-toggle-lbl">— ระบบที่ 4</div>
-            <div class="hcm-tog"><span></span></div>
-          </div>
-        </div>
-      </div>
-      <div id="hcm-v-cal" style="display:none;flex-direction:column">
-        <div id="hcm-calv-month">
-          <div class="hcm-cal-nav">
-            <button class="hcm-cal-nb" id="hcm-cal-prev">&#8249;</button>
-            <div class="hcm-cal-lbl" id="hcm-cal-lbl">—</div>
-            <button class="hcm-cal-nb" id="hcm-cal-next">&#8250;</button>
-          </div>
-          <div class="hcm-cal-pf">
-            <span class="hcm-cal-pfl">บุคคล</span>
-            <select id="hcm-pfilter" style="font-size:9px;flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.92);padding:2px 5px;outline:none"><option value="">ทุกคน</option></select>
-          </div>
-          <div class="hcm-cal-dows"><div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div></div>
-          <div class="hcm-cal-grid" id="hcm-cal-grid"></div>
-          <div class="hcm-cal-leg" id="hcm-cal-leg"></div>
-          <div id="hcm-cal-det" style="display:none"></div>
-        </div>
-        <div id="hcm-calv-list" style="display:none;padding:10px 14px 12px 11px">
-          <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">กำหนดการทั้งหมด</div></div>
-          <div id="hcm-ev-list"></div>
-        </div>
-        <div id="hcm-calv-add" style="display:none;padding:10px 14px 12px 11px">
-          <div class="hcm-dvd"><div class="hcm-dvdg"></div><div class="hcm-dvdt">เพิ่มกำหนดการ</div></div>
-          <div class="hcm-fg"><div class="hcm-fl">บุคคล</div><input type="text" id="hcm-a-person" placeholder="ชื่อตัวละคร" class="hcm-inp"></div>
-          <div class="hcm-fg"><div class="hcm-fl">วันที่</div><input type="date" id="hcm-a-date" class="hcm-inp"></div>
-          <div class="hcm-fg"><div class="hcm-fl">เวลา</div><input type="time" id="hcm-a-time" class="hcm-inp"></div>
-          <div class="hcm-fg"><div class="hcm-fl">กิจกรรม</div><input type="text" id="hcm-a-act" placeholder="รายละเอียดกิจกรรม" class="hcm-inp"></div>
-          <div class="hcm-fg"><div class="hcm-fl">สัญลักษณ์</div><select id="hcm-a-sym" class="hcm-inp">${symOpts}</select></div>
-          <div class="hcm-fg"><div class="hcm-fl">รายละเอียด</div><input type="text" id="hcm-a-detail" placeholder="โน้ตเพิ่มเติม" class="hcm-inp"></div>
-          <button class="hcm-btnp" id="hcm-add-save" style="margin-top:4px;width:100%">&#43; บันทึก</button>
-        </div>
-      </div>
-    </div>
-    <div class="hcm-band hcm-bot"></div>
-    <div class="hcm-hind"><div class="hcm-hbar"></div></div>
-  </div>
-</div>
-<div id="hcm-pop">
-  <div class="hcm-ps">
-    <div class="hcm-ph">
-      <span class="hcm-pt" id="hcm-pt">—</span>
-      <button class="hcm-pc" id="hcm-pc-btn">คัดลอก</button>
-      <div class="hcm-px" id="hcm-pop-close">&#215;</div>
-    </div>
-    <div class="hcm-ptb">
-      <div class="hcm-ptt hcm-on" data-pt="src">ซอร์สโค้ด</div>
-      <div class="hcm-ptt" data-pt="prev">พรีวิว</div>
-    </div>
-    <div class="hcm-pb">
-      <div id="hcm-ptsrc"><pre id="hcm-psrc" style="font-family:'Courier New',monospace;font-size:9px;color:rgba(255,255,255,.88);white-space:pre-wrap;word-break:break-all;line-height:1.6;margin:0;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);padding:10px"></pre></div>
-      <div id="hcm-ptprev" style="display:none"><div id="hcm-pprev" style="background:white;padding:14px;min-height:60px"></div></div>
-    </div>
-  </div>
-</div>`;
-}
-
-function initStars() {
-    const canvas = document.getElementById('hcm-sc');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let W=1, H=1, stars=[];
-
-    function makeStars(w, h) {
-        stars = [];
-        const n = Math.max(60, Math.floor(w * h / 2000));
-        for (let i = 0; i < n; i++) {
-            const sz = Math.random();
-            stars.push({
-                x:  Math.random() * w,
-                y:  Math.random() * h,
-                r:  sz < .6 ? .32 : sz < .88 ? .6 : .95,
-                a:  .08 + Math.random() * .82,
-                da: (.0003 + Math.random() * .001) * (Math.random() < .5 ? 1 : -1),
-                vx: (Math.random() - .5) * .28,
-                vy: (Math.random() - .5) * .28,
-                col: Math.random() < .5 ? '255,255,255' :
-                     Math.random() < .5 ? '220,200,255' : '175,220,255'
-            });
-        }
-    }
-
-    // expose ออกมาให้ openPanel เรียกได้
-    window._hcmResizeStars = function() {
-        const panel = document.getElementById('hcm-panel');
-        if (!panel) return;
-        const pw = panel.offsetWidth, ph = panel.offsetHeight;
-        if (!pw || !ph) return;
-        W = canvas.width  = pw;
-        H = canvas.height = ph;
-        makeStars(W, H);
-    };
-
-    function draw() {
-        // ใช้ W,H จาก closure โดยตรง — ถ้า resize เปลี่ยน W,H loop จะเห็นค่าใหม่เสมอ
-        requestAnimationFrame(draw);
-        if (!document.getElementById('hcm-sc')) return;
-        ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#0b0c1a';
-        ctx.fillRect(0, 0, W, H);
-        if (W < 10 || stars.length === 0) return;
-        // nebula
-        const g1 = ctx.createRadialGradient(W*.22, H*.28, 0, W*.22, H*.28, W*.55);
-        g1.addColorStop(0, 'rgba(140,70,200,.1)'); g1.addColorStop(1, 'transparent');
-        ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
-        const g2 = ctx.createRadialGradient(W*.8, H*.65, 0, W*.8, H*.65, W*.45);
-        g2.addColorStop(0, 'rgba(70,90,210,.08)'); g2.addColorStop(1, 'transparent');
-        ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
-        // stars
-        stars.forEach(s => {
-            s.a += s.da;
-            if (s.a > .92 || s.a < .05) s.da *= -1;
-            s.x += s.vx; s.y += s.vy;
-            if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
-            if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(${s.col},${s.a.toFixed(2)})`;
-            ctx.fill();
-        });
-    }
-
-    draw();  // เริ่ม loop — stars จะปรากฏทันทีที่ _hcmResizeStars ถูกเรียก
-    setTimeout(window._hcmResizeStars, 200);
-}
-
-// ── Drag (controlled by settings toggle) ─────────────────────
-let dragMode = false;
-
-function initDrag() {
-    const panel = document.getElementById('hcm-panel');
-    if (!panel) return;
-    let ox=0, oy=0, on=false;
-
-    function start(cx, cy) {
-        if (!dragMode) return;
-        on = true;
-        const r = panel.getBoundingClientRect();
-        ox = cx - r.left; oy = cy - r.top;
-        panel.style.transition = 'none';
-        panel.style.userSelect = 'none';
-    }
-    function move(cx, cy) {
-        if (!on) return;
-        let nx = cx - ox, ny = cy - oy;
-        nx = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  nx));
-        ny = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, ny));
-        panel.style.left = nx + 'px'; panel.style.top = ny + 'px';
-        panel.style.right = 'auto';   panel.style.transform = 'none';
-        panel.dataset.userMoved = '1';  // จำว่าผู้ใช้ลากไปแล้ว
-    }
-    function end() { on = false; panel.style.userSelect = ''; }
-
-    panel.addEventListener('mousedown',   e => { if (!dragMode) return; e.preventDefault(); start(e.clientX, e.clientY); });
-    document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
-    document.addEventListener('mouseup',   end);
-    panel.addEventListener('touchstart',  e => { if (!dragMode) return; const t=e.touches[0]; start(t.clientX,t.clientY); }, { passive:true });
-    document.addEventListener('touchmove', e => { if (!on) return; e.preventDefault(); const t=e.touches[0]; move(t.clientX,t.clientY); }, { passive:false });
-    document.addEventListener('touchend',  end);
-}
-
-function toggleDragMode() {
-    dragMode = !dragMode;
-    const tog   = document.getElementById('hcm-tog-drag');
-    const panel = document.getElementById('hcm-panel');
-    const book  = panel && panel.querySelector('.hcm-book');
-    if (tog) tog.classList.toggle('hcm-tog-on', dragMode);
-    if (book) book.style.cursor = dragMode ? 'grab' : '';
-}
-
-function bindEvents() {
-    document.getElementById('hcm-close').addEventListener('click', togglePanel);
-    document.getElementById('hcm-back' ).addEventListener('click', navBack);
-
-    // settings drag toggle
-    const togDrag = document.getElementById('hcm-tog-drag');
-    if (togDrag) togDrag.addEventListener('click', toggleDragMode);
-
-    document.querySelectorAll('.hcm-bm').forEach(bm => {
-        function handleBm() {
-            const target = bm.dataset.bm;
-            if (!isOpen) {
-                openPanel();
-                // delay เล็กน้อยรอ panel display:block ก่อน
-                setTimeout(() => {
-                    if (target === 'toc') navBack();
-                    else openSec(target);
-                }, 20);
-            } else {
-                if (target === 'toc') navBack();
-                else openSec(target);
-            }
-        }
-        bm.addEventListener('click', handleBm);
-        bm.addEventListener('touchend', e => { e.preventDefault(); handleBm(); });
+    document.getElementById('hg-close').addEventListener('click', togglePanel);
+    document.getElementById('hg-search').addEventListener('input', (e) => {
+      searchQuery = e.target.value.toLowerCase();
+      renderList();
     });
-    document.querySelectorAll('.hcm-trow.hcm-can').forEach(r =>
-        r.addEventListener('click', () => openSec(r.dataset.nav)));
-
-    document.querySelectorAll('#hcm-tabs-code .hcm-stab').forEach(t =>
-        t.addEventListener('click', () => switchSub('code', t.dataset.sv)));
-    document.querySelectorAll('#hcm-tabs-cal .hcm-stab').forEach(t =>
-        t.addEventListener('click', () => {
-            switchSub('cal', t.dataset.cv);
-            if (t.dataset.cv==='month') renderGrid();
-            if (t.dataset.cv==='list')  renderList();
-        }));
-
-    document.getElementById('hcm-cal-prev').addEventListener('click', ()=>{ calView.month--; if(calView.month<0){calView.month=11;calView.year--;} renderGrid(); });
-    document.getElementById('hcm-cal-next').addEventListener('click', ()=>{ calView.month++; if(calView.month>11){calView.month=0;calView.year++;} renderGrid(); });
-    document.getElementById('hcm-pfilter').addEventListener('change', renderGrid);
-    document.getElementById('hcm-clear-btn' ).addEventListener('click', ()=>{ codeData().blocks=[]; _saveSet(); refreshCodeUI(); });
-    document.getElementById('hcm-export-btn').addEventListener('click', exportJSON);
-    document.getElementById('hcm-add-save'  ).addEventListener('click', saveEvent);
-    document.getElementById('hcm-a-date').value = dStr(new Date());
-
-    document.getElementById('hcm-pop-close').addEventListener('click', closePop);
-    document.getElementById('hcm-pop').addEventListener('click', e=>{ if(e.target.id==='hcm-pop') closePop(); });
-    document.getElementById('hcm-pc-btn').addEventListener('click', ()=>{
-        const b=codeData().blocks.find(x=>x.id===curPopId); if(!b) return;
-        navigator.clipboard.writeText(b.html).catch(()=>{});
-        const btn=document.getElementById('hcm-pc-btn');
-        btn.textContent='คัดลอกแล้ว'; setTimeout(()=>btn.textContent='คัดลอก',1400);
+    document.getElementById('hg-clear-btn').addEventListener('click', () => {
+      log = [];
+      updateBadge();
+      renderList();
     });
-    document.querySelectorAll('.hcm-ptt').forEach(t=>t.addEventListener('click',()=>{
-        document.querySelectorAll('.hcm-ptt').forEach(x=>x.classList.remove('hcm-on')); t.classList.add('hcm-on');
-        document.getElementById('hcm-ptsrc' ).style.display=t.dataset.pt==='src' ?'block':'none';
-        document.getElementById('hcm-ptprev').style.display=t.dataset.pt==='prev'?'block':'none';
-    }));
+  }
 
-    initDrag();
-}
-
-function openPanel() {
-    isOpen = true;
-    const p = document.getElementById('hcm-panel');
-    p.classList.add('hcm-open');
-    // center + resize stars ทุกครั้งที่เปิด (ถ้ายังไม่เคยลาก)
-    setTimeout(() => {
-        if (!p.dataset.userMoved) {
-            const pw = p.offsetWidth  || 315;
-            const ph = p.offsetHeight || 500;
-            const nx = Math.max(4, Math.round((window.innerWidth  - pw) / 2));
-            const ny = Math.max(4, Math.round((window.innerHeight - ph) / 2));
-            p.style.left = nx+'px'; p.style.top = ny+'px';
-                        p.style.right = 'auto'; p.style.transform = 'none';
-        }
-        // resize stars canvas ทุกครั้ง
-        if (window._hcmResizeStars) window._hcmResizeStars();
-    }, 40);
-}
-function closePanel() { isOpen=false; document.getElementById('hcm-panel').classList.remove('hcm-open'); }
-function togglePanel() { isOpen ? closePanel() : openPanel(); }
-
-function setActiveBm(s) {
-    document.querySelectorAll('.hcm-bm').forEach(b=>b.classList.toggle('hcm-active',b.dataset.bm===s));
-}
-
-function openSec(s) {
-    curSection = s;
-    // hide all
-    ['toc','code','cal'].forEach(v => {
-        const e = document.getElementById(`hcm-v-${v}`);
-        if (e) { e.style.display = 'none'; e.style.flexDirection = ''; }
-    });
-    document.getElementById('hcm-tabs-code').style.display = 'none';
-    document.getElementById('hcm-tabs-cal' ).style.display = 'none';
-    document.getElementById('hcm-back').style.display = 'flex';
-    setActiveBm(s);
-
-    if (s === 'code') {
-        const vc = document.getElementById('hcm-v-code');
-        vc.style.display = 'flex'; vc.style.flexDirection = 'column';
-        document.getElementById('hcm-tabs-code').style.display = 'flex';
-        // show active sub-tab (default: code list)
-        const activeSv = document.querySelector('#hcm-tabs-code .hcm-stab.hcm-on');
-        const svName   = activeSv ? activeSv.dataset.sv : 'code';
-        ['code','settings'].forEach(k => {
-            const el = document.getElementById(`hcm-sv-${k}`);
-            if (el) el.style.display = k === svName ? 'block' : 'none';
-        });
-        setHdr('ระบบที่ 01', 'ตัวจัดการโค้ด', 'HTML Block Store');
-        refreshCodeUI();
+  function togglePanel() {
+    panelOpen = !panelOpen;
+    const panel = document.getElementById('hg-panel');
+    const badge = document.getElementById('hg-badge');
+    if (panelOpen) {
+      panel.classList.remove('hg-hidden');
+      panel.classList.add('hg-visible');
+      badge.classList.add('hg-active');
+      renderList();
     } else {
-        // calendar
-        const vc = document.getElementById('hcm-v-cal');
-        vc.style.display = 'flex'; vc.style.flexDirection = 'column';
-        document.getElementById('hcm-tabs-cal').style.display = 'flex';
-        // show active cal sub-tab (default: month)
-        const activeCv = document.querySelector('#hcm-tabs-cal .hcm-stab.hcm-on');
-        const cvName   = activeCv ? activeCv.dataset.cv : 'month';
-        ['month','list','add'].forEach(k => {
-            const el = document.getElementById(`hcm-calv-${k}`);
-            if (el) el.style.display = k === cvName ? 'block' : 'none';
-        });
-        setHdr('ระบบที่ 02', 'ปฏิทินตัวละคร', 'กิจกรรมในโรล');
-        buildPF(); renderGrid(); renderList();
+      panel.classList.add('hg-hidden');
+      panel.classList.remove('hg-visible');
+      badge.classList.remove('hg-active');
     }
-}
+  }
 
-function navBack() {
-    curSection='toc';
-    document.getElementById('hcm-v-code').style.display='none';
-    document.getElementById('hcm-v-cal' ).style.display='none';
-    document.getElementById('hcm-v-toc' ).style.display='block';
-    document.getElementById('hcm-tabs-code').style.display='none';
-    document.getElementById('hcm-tabs-cal' ).style.display='none';
-    document.getElementById('hcm-back').style.display='none';
-    setHdr('HCM Diary','สารบัญระบบ','ส่วนขยาย SillyTavern');
-    setActiveBm('toc');
-}
+  function renderList() {
+    const listEl  = document.getElementById('hg-list');
+    const emptyEl = document.getElementById('hg-empty');
+    const countEl = document.getElementById('hg-footer-count');
+    if (!listEl) return;
 
-function switchSub(sec,name){
-    const tabsId=sec==='code'?'hcm-tabs-code':'hcm-tabs-cal';
-    const attr  =sec==='code'?'sv':'cv';
-    document.querySelectorAll(`#${tabsId} .hcm-stab`).forEach(x=>x.classList.remove('hcm-on'));
-    const t=document.querySelector(`#${tabsId} .hcm-stab[data-${attr}="${name}"]`);
-    if(t) t.classList.add('hcm-on');
-    if(sec==='code'){
-        ['code','settings'].forEach(k=>{ const e=document.getElementById(`hcm-sv-${k}`); if(e) e.style.display='none'; });
-        const v=document.getElementById(`hcm-sv-${name}`); if(v) v.style.display='block';
-    } else {
-        ['month','list','add'].forEach(k=>{ const e=document.getElementById(`hcm-calv-${k}`); if(e) e.style.display='none'; });
-        const v=document.getElementById(`hcm-calv-${name}`); if(v) v.style.display='block';
+    const q = searchQuery.trim();
+    const filtered = q
+      ? log.filter(e =>
+          e.char.toLowerCase().includes(q) ||
+          e.raw.toLowerCase().includes(q) ||
+          e.tags.some(t => t.toLowerCase().includes(q)) ||
+          e.stripped.toLowerCase().includes(q)
+        )
+      : log;
+
+    countEl.textContent = `${filtered.length} รายการ`;
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      return;
     }
-}
+    emptyEl.style.display = 'none';
 
-const TH_M=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-const TH_S=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    listEl.innerHTML = filtered.map(e => `
+      <div class="hg-entry" data-id="${e.id}">
+        <div class="hg-entry-meta">
+          <span class="hg-char">${escHtml(e.char)}</span>
+          <span class="hg-ts">${e.ts}</span>
+          <span class="hg-tag-count">${e.tags.length} tag${e.tags.length > 1 ? 's' : ''}</span>
+        </div>
+        <div class="hg-tags">
+          ${e.tags.slice(0, 10).map(t => `<code class="hg-tag">${escHtml(t.length > 40 ? t.slice(0,40)+'…' : t)}</code>`).join('')}
+          ${e.tags.length > 10 ? `<code class="hg-tag hg-tag-more">+${e.tags.length - 10} more</code>` : ''}
+        </div>
+        <details class="hg-details">
+          <summary>ดู raw HTML</summary>
+          <pre class="hg-raw">${escHtml(e.raw)}</pre>
+        </details>
+      </div>
+    `).join('');
+  }
 
-function renderGrid(){
-    const{year,month}=calView;
-    document.getElementById('hcm-cal-lbl').textContent=`${TH_M[month]} ${year+543}`;
-    const pf=document.getElementById('hcm-pfilter').value;
-    const evts=calData().events.filter(e=>!pf||e.person===pf);
-    const first=new Date(year,month,1).getDay();
-    const last =new Date(year,month+1,0).getDate();
-    const todayS=dStr(new Date());
-    const g=document.getElementById('hcm-cal-grid'); g.innerHTML='';
-    for(let i=0;i<first;i++){ const c=document.createElement('div'); c.className='hcm-cd hcm-emp'; g.appendChild(c); }
-    for(let d=1;d<=last;d++){
-        const ds=`${year}-${pad(month+1)}-${pad(d)}`;
-        const de=evts.filter(e=>e.date===ds);
-        const c=document.createElement('div');
-        c.className='hcm-cd'+(ds===todayS?' hcm-tdy':'')+(ds===selDate?' hcm-sel':'');
-        c.innerHTML=`<div class="hcm-dn">${d}</div>`;
-        if(de.length){
-            const ss=document.createElement('div'); ss.className='hcm-syms';
-            de.slice(0,3).forEach(ev=>{
-                const sy=SYM[ev.symbol]||SYM.general;
-                const sp=document.createElement('span');
-                sp.className='hcm-sym'; sp.style.color=sy.col; sp.textContent=sy.c;
-                ss.appendChild(sp);
-            }); c.appendChild(ss);
-        }
-        c.addEventListener('click',()=>showDay(ds,de)); g.appendChild(c);
-    }
-    renderLeg();
-}
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
 
-function renderLeg(){
-    document.getElementById('hcm-cal-leg').innerHTML=Object.values(SYM).map(v=>
-        `<div class="hcm-leg-it"><span class="hcm-sym" style="color:${v.col}">${v.c}</span><span>${v.l}</span></div>`).join('');
-}
+  /* ── Init ───────────────────────────────────────────────── */
+  function init() {
+    createBadge();
+    createPanel();
+    hookMessages();
+    console.log(`[${EXT_NAME}] loaded ✦`);
+  }
 
-function showDay(ds,evts){
-    selDate=ds; renderGrid();
-    const det=document.getElementById('hcm-cal-det');
-    if(!evts.length){ det.style.display='none'; return; }
-    det.style.display='block';
-    const[y,m,d]=ds.split('-');
-    det.innerHTML=`<div class="hcm-det-hd"><div class="hcm-det-date">${parseInt(d)} ${TH_S[parseInt(m)-1]} ${parseInt(y)+543}</div><div class="hcm-det-cnt">${evts.length} กิจกรรม</div></div>`
-        +evts.map(ev=>{ const sy=SYM[ev.symbol]||SYM.general;
-            return`<div class="hcm-det-row"><div class="hcm-det-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-det-body"><div class="hcm-det-act">${ev.activity}</div><div class="hcm-det-meta"><span>${ev.person||'ทุกคน'}</span><span>${ev.time||'--:--'}</span></div>${ev.details?`<div class="hcm-det-note">${ev.details}</div>`:''}</div><div class="hcm-det-del" data-id="${ev.id}">&#215;</div></div>`;
-        }).join('');
-    det.querySelectorAll('.hcm-det-del').forEach(b=>b.addEventListener('click',()=>{ removeEvent(parseFloat(b.dataset.id)); det.style.display='none'; selDate=null; }));
-}
+  // Wait for DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    setTimeout(init, 500);   // give ST a moment to boot
+  }
 
-function renderList(){
-    const el=document.getElementById('hcm-ev-list'); if(!el) return;
-    const s=[...calData().events].sort((a,b)=>(`${a.date}${a.time}`).localeCompare(`${b.date}${b.time}`));
-    const ts=dStr(new Date());
-    if(!s.length){ el.innerHTML='<div class="hcm-empty"><p>ยังไม่มีกำหนดการ</p></div>'; return; }
-    el.innerHTML=s.map(ev=>{ const sy=SYM[ev.symbol]||SYM.general;
-        return`<div class="hcm-lev${ev.date<ts?' hcm-past':''}"><div class="hcm-lev-sym" style="color:${sy.col}">${sy.c}</div><div class="hcm-lev-body"><div class="hcm-lev-act">${ev.activity}</div><div class="hcm-lev-meta">${ev.date} ${ev.time}·${ev.person||'ทุกคน'}</div>${ev.details?`<div class="hcm-lev-det">${ev.details}</div>`:''}</div><div class="hcm-lev-del" data-id="${ev.id}">&#215;</div></div>`;
-    }).join('');
-    el.querySelectorAll('.hcm-lev-del').forEach(b=>b.addEventListener('click',()=>removeEvent(parseFloat(b.dataset.id))));
-}
-
-function buildPF(){
-    const sel=document.getElementById('hcm-pfilter'); if(!sel) return;
-    const cur=sel.value;
-    const ps=[...new Set(calData().events.map(e=>e.person).filter(Boolean))];
-    sel.innerHTML='<option value="">ทุกคน</option>'+ps.map(p=>`<option value="${p}">${p}</option>`).join('');
-    sel.value=cur;
-}
-
-function saveEvent(){
-    const act=document.getElementById('hcm-a-act').value.trim(); if(!act) return;
-    addEvent({ person:document.getElementById('hcm-a-person').value.trim(),
-        date:document.getElementById('hcm-a-date').value||dStr(new Date()),
-        time:document.getElementById('hcm-a-time').value, activity:act,
-        symbol:document.getElementById('hcm-a-sym').value,
-        details:document.getElementById('hcm-a-detail').value.trim() });
-    document.getElementById('hcm-a-act').value=''; document.getElementById('hcm-a-detail').value='';
-    switchSub('cal','list'); renderList();
-}
-
-function refreshCalUI(){ if(curSection!=='cal') return; renderGrid(); renderList(); buildPF(); }
-
-function refreshCodeUI(){
-    const blocks=codeData().blocks;
-    const total=blocks.length, tok=blocks.reduce((a,b)=>a+b.tokens,0);
-    setT('hcm-total',total); setT('hcm-tok','~'+tok); updateBadge();
-    const list=document.getElementById('hcm-codelist'); if(!list) return;
-    if(!total){ list.innerHTML='<div class="hcm-empty"><p>ยังไม่มีบล็อก</p></div>'; return; }
-    list.innerHTML=blocks.map(b=>`<div class="hcm-card"><div class="hcm-chead"><span class="hcm-ctag">&lt;code${b.id}&gt;</span><span class="hcm-cid">#${b.id}·${b.ts}</span><div style="display:flex;gap:2px"><div class="hcm-ib" data-a="preview" data-id="${b.id}">&#9675;</div><div class="hcm-ib" data-a="copy" data-id="${b.id}">&#9632;</div><div class="hcm-ib hcm-del" data-a="del" data-id="${b.id}">&#215;</div></div></div><div style="padding:5px 8px 7px"><div class="hcm-cpre">${esc(b.html)}</div><div class="hcm-cmeta"><span>~${b.tokens} tok</span><span>msg#${b.msgId||'—'}</span></div></div></div>`).join('');
-    list.querySelectorAll('.hcm-ib').forEach(btn=>btn.addEventListener('click',()=>{
-        const id=parseInt(btn.dataset.id);
-        if(btn.dataset.a==='preview') openPop(id);
-        if(btn.dataset.a==='copy')    copyBlock(id,btn);
-        if(btn.dataset.a==='del')     removeBlock(id);
-    }));
-}
-
-function openPop(id){
-    const b=codeData().blocks.find(x=>x.id===id); if(!b) return;
-    curPopId=id; setT('hcm-pt',`code${b.id} · ~${b.tokens} token`);
-    document.getElementById('hcm-psrc' ).textContent=b.html;
-    document.getElementById('hcm-pprev').innerHTML  =b.html;
-    document.querySelectorAll('.hcm-ptt').forEach(t=>t.classList.remove('hcm-on'));
-    document.querySelector('[data-pt="src"]').classList.add('hcm-on');
-    document.getElementById('hcm-ptsrc' ).style.display='block';
-    document.getElementById('hcm-ptprev').style.display='none';
-    document.getElementById('hcm-pop').classList.add('hcm-on');
-}
-function closePop(){ document.getElementById('hcm-pop').classList.remove('hcm-on'); }
-function copyBlock(id,btn){
-    const b=codeData().blocks.find(x=>x.id===id); if(!b) return;
-    navigator.clipboard.writeText(b.html).catch(()=>{});
-    btn.textContent='\u2713'; setTimeout(()=>btn.textContent='&#9632;',1200);
-}
-function exportJSON(){
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([JSON.stringify({chatId:getChatId(),calendar:calData(),code:codeData()},null,2)],{type:'application/json'}));
-    a.download=`hcm-${getChatId()}.json`; a.click();
-}
-function renderCodeMarkers(msgId){
-    const blocks=codeData().blocks.filter(b=>b.msgId===msgId);
-    if(!blocks.length) return;
-    const el=document.querySelector(`[mesid="${msgId}"] .mes_text`); if(!el) return;
-    blocks.forEach(b=>{
-        const tag=`<code${b.id}></code${b.id}>`;
-        const card=`<div class="hcm-inline-block"><span class="hcm-inline-tag">HTML Block ${b.id}</span><span class="hcm-inline-meta">~${b.tokens} tok</span><button class="hcm-inline-prev" onclick="hcmOpenPop(${b.id})">Preview</button></div>`;
-        el.innerHTML=el.innerHTML.replace(tag,card);
-    });
-}
-window.hcmOpenPop=function(id){ if(!isOpen) openPanel(); openSec('code'); openPop(id); };
-
-function startClock(){
-    function tick(){
-        const n=new Date();
-        setT('hcm-clock',n.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
-        setT('hcm-date', n.toLocaleDateString('th-TH',{month:'short',day:'numeric',year:'numeric'}));
-    }
-    tick(); setInterval(tick,1000);
-}
-function updateChatLabel(){ try{ const ctx=_getCtx(); setT('hcm-chatname',ctx.name2||'SillyTavern'); setT('hcm-charname',ctx.name2||'—'); }catch{} }
-function updateBadge(){ const n=codeData().blocks.length; setT('hcm-bdg-n',n); setT('hcm-cnt',n); }
-function refreshAllUI(){ refreshCodeUI(); updateChatLabel(); if(curSection==='cal'){ renderGrid(); renderList(); buildPF(); } }
-function setHdr(ey,ti,su){ setT('hcm-eyebrow',ey); setT('hcm-title',ti); setT('hcm-sub',su); }
-function setT(id,v){ const e=document.getElementById(id); if(e) e.textContent=v; }
-function dStr(d){ return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-function pad(n){ return String(n).padStart(2,'0'); }
-function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function registerHooks(){
-    const es=window.eventSource, et=window.event_types;
-    if(!es||!et){ console.warn('[HCM] ST events not available'); return; }
-    es.on(et.MESSAGE_RECEIVED, msgId=>processMessage(msgId));
-    es.on(et.MESSAGE_RENDERED, msgId=>renderCodeMarkers(msgId));
-    es.on(et.CHAT_CHANGED, ()=>{ gCnt=0; updateInjection(); refreshAllUI(); });
-}
-
-console.log('[HCM] Registering entry...');
-
-function hcmInit(){
-    try{
-        console.log('[HCM] hcmInit called');
-        S(); createPanel(); registerHooks(); updateInjection();
-        console.log('[HCM] ✓ Ready');
-    } catch(e){
-        console.error('[HCM] Error:',e);
-        const dbg=document.createElement('div');
-        dbg.style.cssText='position:fixed;bottom:10px;right:10px;z-index:99999;background:red;color:white;padding:6px 12px;font-size:12px;border-radius:4px;cursor:pointer';
-        dbg.textContent='HCM ERROR — tap for details'; dbg.onclick=()=>alert(e.stack||e);
-        document.body.appendChild(dbg);
-    }
-}
-
-if(typeof jQuery!=='undefined') jQuery(hcmInit);
-else if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hcmInit);
-else hcmInit();
+})();
