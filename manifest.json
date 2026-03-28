@@ -1,8 +1,8 @@
 {
   "display_name": "HTML Ghost",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "Blue",
-  "description": "Strips HTML tags from bot messages before display. Logs all removed tags for inspection.",
+  "description": "Renders <code:N> blocks as HTML in chat. Strips HTML from model context. Live-editable via panel.",
   "requires": [],
   "js": "index.js",
   "css": "style.css",
