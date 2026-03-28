@@ -1,12 +1,11 @@
 {
-  "display_name": "HCM Diary",
-  "version": "2.1.0",
-  "author": "HCM",
-  "description": "ตัวจัดการโค้ด HTML + ปฏิทินตัวละคร แยกข้อมูลต่อแชท บันทึกถาวรใน ST",
+  "display_name": "HTML Ghost",
+  "version": "1.0.0",
+  "author": "Blue",
+  "description": "Strips HTML tags from bot messages before display. Logs all removed tags for inspection.",
   "requires": [],
-  "optional": [],
   "js": "index.js",
   "css": "style.css",
   "homepage": "",
-  "tags": ["utility", "calendar", "code-manager"]
+  "loading_order": 10
 }
