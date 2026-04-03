@@ -218,10 +218,35 @@
   }
 
   // ── SillyTavern hooks ────────────────────────────────────────
+  //
+  //  CRITICAL: We ONLY read chat[idx].mes (raw bot text, before ST
+  //  renders markdown→HTML). We NEVER extract from .mes_text innerHTML
+  //  because that already has ST-generated <p> <em> <h1> etc.
+  //
+  //  Timeline:
+  //    MESSAGE_RECEIVED → raw text in chat[idx].mes
+  //                     → strip bot's HTML blocks, rewrite mes
+  //                     → ST parses clean text + ⬡markers⬡
+  //    MESSAGE_RENDERED → DOM painted → inject widgets at markers
+  //    MutationObserver → ONLY inject widgets, never re-extract from DOM
+  //
   function hookMessages() {
     if (window.eventSource && window.event_types) {
       const ev = window.event_types;
-      eventSource.on(ev.MESSAGE_RECEIVED, idx => { processMessage(idx); });
+
+      // Intercept raw message before ST touches it
+      eventSource.on(ev.MESSAGE_RECEIVED, idx => {
+        processMessage(idx);
+      });
+
+      // Streaming done / message updated — only if not yet processed
+      if (ev.MESSAGE_UPDATED) {
+        eventSource.on(ev.MESSAGE_UPDATED, idx => {
+          if (!store[idx]) processMessage(idx);
+        });
+      }
+
+      // Inject widgets after DOM is painted
       eventSource.on(ev.MESSAGE_RENDERED, idx => {
         if (store[idx]) renderPlaceholders(idx);
       });
@@ -241,22 +266,14 @@
             ? node : node.querySelector?.('.mes');
           if (!mes || mes.dataset.isUser === 'true') return;
 
-          const idx    = parseInt(mes.getAttribute('mesid') ?? '-1');
+          const idx = parseInt(mes.getAttribute('mesid') ?? '-1');
           if (isNaN(idx) || idx < 0) return;
-          const textEl = mes.querySelector('.mes_text');
-          if (!textEl) return;
 
-          // DOM fallback (e.g. loaded history)
-          if (!store[idx]) {
-            const raw = textEl.innerHTML;
-            if (!/<[a-zA-Z]/.test(raw)) return;
-            const { processed, blockKeys } = extractBlocks(raw, idx);
-            if (blockKeys.length === 0) return;
-            textEl.innerHTML = processed;
-            updateBadge();
+          // !! ONLY inject widgets for already-processed messages !!
+          // NEVER extract from innerHTML — that's ST-rendered HTML, not bot HTML
+          if (store[idx]) {
+            setTimeout(() => renderPlaceholders(idx), 60);
           }
-
-          setTimeout(() => renderPlaceholders(idx), 60);
         });
       });
     }).observe(chatEl, { childList: true, subtree: true });
