@@ -1,119 +1,262 @@
-
 /* ── ST HTML Hider — Styles ─────────────────────────────────────────────── */
 
-/* ── Outer wrapper ── */
+/* ════════════════════════════════════
+   ข้อความ wrapper (แต่ละ HTML block)
+   ════════════════════════════════════ */
+
 .hh-wrapper {
-  margin: 0.5em 0;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 14%, transparent);
-  overflow: hidden;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 3%, transparent);
-  transition: box-shadow 0.15s ease;
+    margin: 0.5em 0;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 14%, transparent);
+    border-radius: 8px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 3%, transparent);
+    transition: box-shadow .15s;
 }
 
 .hh-wrapper.hh-open {
-  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 3px 16px rgba(0,0,0,.28);
 }
 
-/* ── Rendered visual area ── */
+/* Flash animation เมื่อกด "ไป" จาก Inspector */
+.hh-wrapper.hh-flash {
+    animation: hh-flash-anim .9s ease;
+}
+@keyframes hh-flash-anim {
+    0%,100% { box-shadow: none; }
+    30%      { box-shadow: 0 0 0 3px rgba(120,200,255,.55); }
+}
+
+/* พื้นที่แสดง HTML จริง */
 .hh-rendered {
-  padding: 10px 14px;
+    padding: 10px 14px;
 }
 
-/* ── Footer toolbar ── */
+/* Footer toolbar */
 .hh-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 5%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 10%, transparent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 5%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 10%, transparent);
 }
 
-/* ── ••• toggle button ── */
+/* ปุ่ม ••• */
 .hh-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 10px 2px 8px;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 20%, transparent);
-  border-radius: 5px;
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 50%, transparent);
-  font-size: 0.78em;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 10px 2px 8px;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 20%, transparent);
+    border-radius: 5px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 55%, transparent);
+    font-size: .78em;
+    cursor: pointer;
+    user-select: none;
+    transition: background .12s, color .12s, border-color .12s;
 }
-
 .hh-toggle-btn:hover {
-  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 10%, transparent);
-  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 85%, transparent);
-  border-color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 35%, transparent);
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 10%, transparent);
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 88%, transparent);
+    border-color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 38%, transparent);
 }
 
-.hh-dots {
-  letter-spacing: 2px;
-  font-size: 1.05em;
-  color: var(--SmartThemeQuoteColor, #aaaaaa);
-}
+.hh-dots    { letter-spacing: 2px; color: var(--SmartThemeQuoteColor, #aaa); font-size: 1.05em; }
+.hh-chevron { font-size: .8em; opacity: .65; }
 
-.hh-chevron {
-  font-size: 0.8em;
-  opacity: 0.65;
-}
-
-/* ── "Hidden from AI" badge ── */
+/* Badge "ซ่อนจาก AI" */
 .hh-badge {
-  margin-left: auto;
-  font-size: 0.71em;
-  padding: 1px 8px;
-  border-radius: 12px;
-  background: rgba(255, 80, 80, 0.1);
-  color: rgba(255, 150, 150, 0.85);
-  border: 1px solid rgba(255, 80, 80, 0.2);
-  white-space: nowrap;
-  user-select: none;
-  cursor: default;
+    margin-left: auto;
+    font-size: .71em;
+    padding: 1px 8px;
+    border-radius: 12px;
+    background: rgba(255,80,80,.1);
+    color: rgba(255,155,155,.9);
+    border: 1px solid rgba(255,80,80,.2);
+    white-space: nowrap;
+    user-select: none;
+    cursor: default;
 }
 
-/* ── Source code panel ── */
+/* Source code panel */
 .hh-source-panel {
-  border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 9%, transparent);
-  background: rgba(0, 0, 0, 0.22);
-  max-height: 420px;
-  overflow-y: auto;
-  overflow-x: auto;
+    border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 9%, transparent);
+    background: rgba(0,0,0,.22);
+    max-height: 420px;
+    overflow: auto;
 }
-
 .hh-source-panel pre {
-  margin: 0;
-  padding: 12px 16px;
-  overflow: visible;
+    margin: 0;
+    padding: 12px 16px;
+    overflow: visible;
 }
-
 .hh-code {
-  font-family: 'JetBrains Mono', 'Consolas', 'Fira Code', 'Courier New', monospace;
-  font-size: 0.79em;
-  line-height: 1.6;
-  color: #86c87a;       /* soft green — HTML vibes */
-  white-space: pre;
-  display: block;
+    font-family: 'JetBrains Mono','Consolas','Fira Code','Courier New',monospace;
+    font-size: .79em;
+    line-height: 1.6;
+    color: #86c87a;
+    white-space: pre;
+    display: block;
 }
 
-/* Highlight tag names a bit brighter */
-.hh-code .hh-tag   { color: #78bfa3; }
-.hh-code .hh-attr  { color: #c8a96e; }
-.hh-code .hh-value { color: #e07070; }
+/* ════════════════════════════════════
+   HTML Inspector Panel
+   ════════════════════════════════════ */
 
-/* ── Settings panel ── */
+.hh-inspector {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 9999;
+    width: 400px;
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--SmartThemeBlurTintColor, #1a1a2e);
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 18%, transparent);
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    /* ซ่อนอยู่ตลอด จนกว่าจะ toggle */
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-8px);
+    transition: opacity .18s, transform .18s;
+}
+.hh-inspector.hh-inspector-open {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+}
+
+/* Header */
+.hh-inspector-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 12%, transparent);
+    user-select: none;
+}
+.hh-inspector-title {
+    font-size: .9em;
+    font-weight: 600;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 85%, transparent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+.hh-inspector-count {
+    font-size: .75em;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: rgba(100,180,255,.2);
+    color: rgba(140,200,255,.9);
+    border: 1px solid rgba(100,180,255,.25);
+    margin-left: 6px;
+}
+.hh-inspector-actions {
+    display: flex;
+    gap: 4px;
+}
+.hh-inspector-actions button {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 20%, transparent);
+    border-radius: 4px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 55%, transparent);
+    width: 26px; height: 26px;
+    cursor: pointer;
+    font-size: .85em;
+    transition: background .1s, color .1s;
+}
+.hh-inspector-actions button:hover {
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 12%, transparent);
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 90%, transparent);
+}
+
+/* Body */
+.hh-inspector-body {
+    overflow-y: auto;
+    flex: 1;
+}
+.hh-inspector-empty {
+    padding: 24px 16px;
+    text-align: center;
+    opacity: .4;
+    font-size: .85em;
+}
+
+/* Item แต่ละ block */
+.hh-inspector-item {
+    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 8%, transparent);
+}
+.hh-inspector-item:last-child { border-bottom: none; }
+
+.hh-inspector-item-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 4%, transparent);
+}
+.hh-inspector-num {
+    font-size: .72em;
+    opacity: .45;
+    min-width: 22px;
+}
+.hh-inspector-tag {
+    font-family: 'JetBrains Mono',monospace;
+    font-size: .78em;
+    color: #78c8a8;
+    flex: 1;
+}
+.hh-inspector-msg {
+    font-size: .7em;
+    opacity: .4;
+}
+.hh-inspector-jump {
+    font-size: .72em;
+    padding: 1px 8px;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 22%, transparent);
+    border-radius: 4px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 60%, transparent);
+    cursor: pointer;
+    transition: background .1s, color .1s;
+    white-space: nowrap;
+}
+.hh-inspector-jump:hover {
+    background: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 10%, transparent);
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #fff) 90%, transparent);
+}
+
+.hh-inspector-item pre {
+    margin: 0;
+    padding: 8px 14px 10px;
+    background: rgba(0,0,0,.18);
+    max-height: 180px;
+    overflow: auto;
+}
+.hh-inspector-code {
+    font-family: 'JetBrains Mono','Consolas','Fira Code',monospace;
+    font-size: .76em;
+    line-height: 1.55;
+    color: #86c87a;
+    white-space: pre;
+    display: block;
+}
+
+/* ════════════════════════════════════
+   Settings panel
+   ════════════════════════════════════ */
+
 .hh-hint {
-  font-size: 0.82em;
-  opacity: 0.5;
-  margin-top: 8px;
-  line-height: 1.55;
+    font-size: .82em;
+    opacity: .5;
+    margin-top: 8px;
+    line-height: 1.55;
 }
+.hh-hint b { opacity: .85; }
 
-.hh-hint strong {
-  opacity: 0.85;
-}
