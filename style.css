@@ -1,1 +1,119 @@
 
+/* ── ST HTML Hider — Styles ─────────────────────────────────────────────── */
+
+/* ── Outer wrapper ── */
+.hh-wrapper {
+  margin: 0.5em 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 14%, transparent);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 3%, transparent);
+  transition: box-shadow 0.15s ease;
+}
+
+.hh-wrapper.hh-open {
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ── Rendered visual area ── */
+.hh-rendered {
+  padding: 10px 14px;
+}
+
+/* ── Footer toolbar ── */
+.hh-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 5%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 10%, transparent);
+}
+
+/* ── ••• toggle button ── */
+.hh-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px 2px 8px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 20%, transparent);
+  border-radius: 5px;
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 50%, transparent);
+  font-size: 0.78em;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.hh-toggle-btn:hover {
+  background: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 10%, transparent);
+  color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 85%, transparent);
+  border-color: color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 35%, transparent);
+}
+
+.hh-dots {
+  letter-spacing: 2px;
+  font-size: 1.05em;
+  color: var(--SmartThemeQuoteColor, #aaaaaa);
+}
+
+.hh-chevron {
+  font-size: 0.8em;
+  opacity: 0.65;
+}
+
+/* ── "Hidden from AI" badge ── */
+.hh-badge {
+  margin-left: auto;
+  font-size: 0.71em;
+  padding: 1px 8px;
+  border-radius: 12px;
+  background: rgba(255, 80, 80, 0.1);
+  color: rgba(255, 150, 150, 0.85);
+  border: 1px solid rgba(255, 80, 80, 0.2);
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
+/* ── Source code panel ── */
+.hh-source-panel {
+  border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, #ffffff) 9%, transparent);
+  background: rgba(0, 0, 0, 0.22);
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.hh-source-panel pre {
+  margin: 0;
+  padding: 12px 16px;
+  overflow: visible;
+}
+
+.hh-code {
+  font-family: 'JetBrains Mono', 'Consolas', 'Fira Code', 'Courier New', monospace;
+  font-size: 0.79em;
+  line-height: 1.6;
+  color: #86c87a;       /* soft green — HTML vibes */
+  white-space: pre;
+  display: block;
+}
+
+/* Highlight tag names a bit brighter */
+.hh-code .hh-tag   { color: #78bfa3; }
+.hh-code .hh-attr  { color: #c8a96e; }
+.hh-code .hh-value { color: #e07070; }
+
+/* ── Settings panel ── */
+.hh-hint {
+  font-size: 0.82em;
+  opacity: 0.5;
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.hh-hint strong {
+  opacity: 0.85;
+}
