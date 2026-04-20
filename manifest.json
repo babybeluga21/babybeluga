@@ -1,13 +1,13 @@
 {
-    "display_name": "HTML Ghost",
-    "version": "1.0.0",
-    "author": "Blue",
-    "description": "Strips HTML blocks from model context, stores them, and renders them visually in chat. Includes a code inspector with source view, live preview, and analysis.",
-    "js": "index.js",
-    "css": "",
-    "homepage": "",
-    "tags": ["utility", "html", "developer"],
-    "dependencies": [],
-    "optional": []
+  "display_name": "HTML Hider",
+  "loading_order": 10,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "",
+  "version": "1.0.0",
+  "homePage": "https://github.com/your-username/st-html-hider",
+  "auto_update": false
 }
 
