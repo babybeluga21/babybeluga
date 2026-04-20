@@ -1,11 +1,13 @@
 {
-    "name": "st-html-hider",
-    "display_name": "HTML Hider & Code Tracker",
+    "display_name": "HTML Ghost",
     "version": "1.0.0",
-    "description": "ซ่อน HTML จากโมเดล AI และหน้าแชท แต่เก็บไว้แสดงผลและตรวจสอบผ่านเมนูข้อความ",
-    "author": "YourName",
+    "author": "Blue",
+    "description": "Strips HTML blocks from model context, stores them, and renders them visually in chat. Includes a code inspector with source view, live preview, and analysis.",
     "js": "index.js",
-    "css": "style.css",
-    "loading_order": 10,
-    "native_extension": true
+    "css": "",
+    "homepage": "",
+    "tags": ["utility", "html", "developer"],
+    "dependencies": [],
+    "optional": []
 }
+
