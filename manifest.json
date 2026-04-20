@@ -1,11 +1,11 @@
 {
-  "display_name": "HTML Ghost",
-  "version": "2.0.0",
-  "author": "Blue",
-  "description": "Renders <code:N> blocks as HTML in chat. Strips HTML from model context. Live-editable via panel.",
-  "requires": [],
-  "js": "index.js",
-  "css": "style.css",
-  "homepage": "",
-  "loading_order": 10
+    "name": "st-html-hider",
+    "display_name": "HTML Hider & Code Tracker",
+    "version": "1.0.0",
+    "description": "ซ่อน HTML จากโมเดล AI และหน้าแชท แต่เก็บไว้แสดงผลและตรวจสอบผ่านเมนูข้อความ",
+    "author": "YourName",
+    "js": "index.js",
+    "css": "style.css",
+    "loading_order": 10,
+    "native_extension": true
 }
