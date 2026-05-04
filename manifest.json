@@ -1,13 +1,10 @@
 {
-  "display_name": "HTML Hider",
-  "loading_order": 10,
-  "requires": [],
-  "optional": [],
-  "js": "index.js",
-  "css": "style.css",
-  "author": "",
+  "name": "html-stripper-renderer",
+  "display_name": "HTML Stripper & Renderer",
   "version": "1.0.0",
-  "homePage": "https://github.com/your-username/st-html-hider",
-  "auto_update": false
+  "author": "YourName",
+  "description": "Extension สำหรับตัด HTML ออกจาก Prompt โมเดล, ดึงข้อมูลวันที่ และ Render โค้ดลงจอโดยไม่ใช้ Token",
+  "asset_url": "github",
+  "main": "index.js",
+  "css": "style.css"
 }
-
